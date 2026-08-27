@@ -52,7 +52,7 @@ export type CalmPresentationState = {
   active: boolean;
   /** When calm is on, whether thinking / CoT blocks are shown. */
   thinking: boolean;
-  /** When calm is on, whether native SKILL.md read rows are shown. */
+  /** When calm is on, whether SKILL.md read rows are shown. */
   skills: boolean;
   stockExportRendering: boolean;
 };
@@ -135,18 +135,12 @@ export function calmPresentationHides(itemClass: CalmTranscriptClass): boolean {
   );
 }
 
-/** Return whether a native Pi read call targets a skill definition file. */
+/** Return whether a read call targets a skill definition file. */
 export function isSkillReadToolCall(
   toolName: unknown,
   args: unknown,
-  isNativeRead = true,
 ): boolean {
-  if (
-    !isNativeRead ||
-    toolName !== "read" ||
-    typeof args !== "object" ||
-    args === null
-  ) {
+  if (toolName !== "read" || typeof args !== "object" || args === null) {
     return false;
   }
 
@@ -155,16 +149,15 @@ export function isSkillReadToolCall(
   return typeof rawPath === "string" && basename(rawPath) === "SKILL.md";
 }
 
-/** Tool-row policy: Calm may show only native reads of SKILL.md. */
+/** Tool-row policy: Calm may show only reads of SKILL.md. */
 export function calmToolCallIsVisible(
   toolName: unknown,
   args: unknown,
-  isNativeRead = true,
 ): boolean {
   return (
     !calm ||
     stockExportRendering ||
-    (skillsVisible && isSkillReadToolCall(toolName, args, isNativeRead))
+    (skillsVisible && isSkillReadToolCall(toolName, args))
   );
 }
 

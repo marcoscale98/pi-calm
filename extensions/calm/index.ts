@@ -9,7 +9,7 @@
  *   - genuine assistant text stays visible
  *   - Pi's built-in Working... activity is always visible and cannot be turned off
  *   - thinking / CoT blocks are hidden by default; `/calm thinking` shows them
- *   - native reads of `SKILL.md` stay hidden by default; `/calm skills` shows them
+ *   - reads of `SKILL.md` stay hidden by default; `/calm skills` shows them
  *   - all other tool shells (built-in and user-defined) are removed from the transcript
  *   - operational user rows marked with U+2063 envelopes render at zero height
  *
@@ -25,7 +25,7 @@
  * Usage:
  *   /calm on           Calm on, thinking and skill reads hidden
  *   /calm thinking     Calm on, toggle thinking / CoT
- *   /calm skills       Calm on, toggle native SKILL.md reads
+ *   /calm skills       Calm on, toggle SKILL.md reads
  *   /calm off          Calm off
  *
  * Verified against Pi 0.81.1–0.82.1. Adapters probe the exact APIs they patch
@@ -128,7 +128,7 @@ const CALM_COMMAND_ARGUMENTS: AutocompleteItem[] = [
   {
     value: "skills",
     label: "skills",
-    description: "Keep Calm on and toggle native SKILL.md reads",
+    description: "Keep Calm on and toggle SKILL.md reads",
   },
   {
     value: "off",

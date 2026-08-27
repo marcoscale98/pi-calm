@@ -226,11 +226,11 @@ assert.equal(calmPresentationHides("genuine-agent-response"), false);
 assert.equal(calmPresentationHides("working-status"), false);
 assert.equal(calmSkillsAreVisible(), false);
 
-// Skill visibility is limited to Pi-native read calls targeting SKILL.md.
+// Skill visibility follows read calls targeting SKILL.md regardless of tool provider.
 assert.equal(isSkillReadToolCall("read", { path: "skills/demo/SKILL.md" }), true);
 assert.equal(
-  isSkillReadToolCall("read", { path: "skills/demo/SKILL.md" }, false),
-  false,
+  isSkillReadToolCall("read", { path: "skills/demo/SKILL.md", raw: true }),
+  true,
 );
 assert.equal(isSkillReadToolCall("read", { path: "/tmp/SKILL.md" }), true);
 assert.equal(isSkillReadToolCall("read", { file_path: "skills/demo/SKILL.md" }), true);
@@ -290,25 +290,12 @@ PiCodingAgent.initTheme();
 const toolRender = PiCodingAgent.ToolExecutionComponent.prototype.render;
 assert.deepEqual(toolRender.call({}, 80), []);
 const nativeReadDefinition = PiCodingAgent.createReadToolDefinition(process.cwd());
-const nativeReadToolDefinition = PiCodingAgent.AgentSession.prototype.getToolDefinition.call(
-  {
-    _toolDefinitions: new Map([["read", { definition: nativeReadDefinition }]]),
-    getAllTools: () => [
-      {
-        name: "read",
-        parameters: nativeReadDefinition.parameters,
-        sourceInfo: { source: "builtin" },
-      },
-    ],
-  },
-  "read",
-);
 const skillTool = new PiCodingAgent.ToolExecutionComponent(
   "read",
   "skill-call",
   { path: "skills/demo/SKILL.md" },
   {},
-  nativeReadToolDefinition,
+  nativeReadDefinition,
   { requestRender() {} } as unknown as ConstructorParameters<
     typeof PiCodingAgent.ToolExecutionComponent
   >[5],
@@ -327,7 +314,7 @@ const ordinaryReadTool = new PiCodingAgent.ToolExecutionComponent(
   process.cwd(),
 );
 assert.deepEqual(ordinaryReadTool.render(80), []);
-// A copied Pi schema with custom execution must not inherit native provenance.
+// Extension-provided read tools keep their own renderer and may show skill reads.
 const customReadTool = new PiCodingAgent.ToolExecutionComponent(
   "read",
   "custom-read-call",
@@ -344,7 +331,10 @@ const customReadTool = new PiCodingAgent.ToolExecutionComponent(
   >[5],
   process.cwd(),
 );
-assert.deepEqual(customReadTool.render(80), []);
+assert.equal(
+  customReadTool.render(80).some((line) => line.includes("[skill]")),
+  true,
+);
 skillTool.setExpanded(true);
 assert.equal(skillTool.render(80).some((line) => line.includes("read")), true);
 skillTool.updateResult({

@@ -15,7 +15,7 @@ Calm is **on by default**:
 | Genuine user prompts | Thinking / CoT blocks (unless `/calm thinking`) |
 | Genuine assistant text | All non-skill tool shells (built-in and user-defined) |
 | Pi's native `Working...` row (always on, cannot be disabled) | Operational user rows marked with `U+2063` envelopes |
-| Pi-native `SKILL.md` read rows (with `/calm skills`) | Native skill reads by default |
+| `read` tool rows targeting `SKILL.md` (with `/calm skills`) | Skill reads by default |
 
 Hidden content remains in the session and comes back when you turn Calm off. `/export` and `/share` briefly restore Pi's normal rendering so exported content remains complete.
 
@@ -55,7 +55,7 @@ Restart Pi (or `/reload`) after install. Project-local installs require project 
 ```text
 /calm on              # Calm on, thinking and skill reads hidden
 /calm thinking        # Calm on, toggle thinking / CoT
-/calm skills          # Calm on, toggle native SKILL.md read rows
+/calm skills          # Calm on, toggle read rows targeting SKILL.md
 /calm off             # restore ordinary transcript
 ```
 
@@ -80,8 +80,8 @@ Contents:
 | --- | --- |
 | `on` | Calm on, thinking and skill reads hidden (default) |
 | `on thinking` | Calm on, thinking / CoT shown, skill reads hidden |
-| `on skills` | Calm on, thinking hidden, native `SKILL.md` reads shown |
-| `on thinking skills` | Calm on, thinking / CoT and native `SKILL.md` reads shown |
+| `on skills` | Calm on, thinking hidden, `SKILL.md` reads shown |
+| `on thinking skills` | Calm on, thinking / CoT and `SKILL.md` reads shown |
 | `off` | Calm off; both optional toggles reset |
 
 Missing file → defaults to **on**. Override the path with `PI_CALM_PREFERENCE_PATH`.
@@ -128,7 +128,7 @@ Pi has no global transcript filter. These stay visible even with Calm on:
 - Custom messages and entries emitted by third-party extensions
 - Generic system / cache / command notices
 
-Adapters probe the exact Pi APIs they patch (`AssistantMessageComponent.updateContent`, `ToolExecutionComponent.render`, `InteractiveMode.addMessageToChat`, `InteractiveMode.setWorkingVisible`). The `ToolExecutionComponent` patch blanks every non-skill tool row, including user-defined tools, even if another extension wins Pi's first-wins tool ownership (e.g. `pi-tool-display`); native `SKILL.md` rows remain available with `/calm skills`. If a future Pi removes a seam, that adapter logs a diagnostic and skips; `/calm` and the rest keep working. No numeric version gate.
+Adapters probe the exact Pi APIs they patch (`AssistantMessageComponent.updateContent`, `ToolExecutionComponent.render`, `InteractiveMode.addMessageToChat`, `InteractiveMode.setWorkingVisible`). The `ToolExecutionComponent` patch blanks every non-skill tool row, including user-defined tools, even if another extension wins Pi's first-wins tool ownership (e.g. `pi-tool-display`); any tool named `read` targeting `SKILL.md` remains available with `/calm skills`, including extension-provided replacements such as `pi-hashline-edit`. If a future Pi removes a seam, that adapter logs a diagnostic and skips; `/calm` and the rest keep working. No numeric version gate.
 
 Upstream was verified against Pi **0.81.1 – 0.82.1**. This fork's `/calm skills` behavior was manually verified against Pi **0.84.2**.
 
