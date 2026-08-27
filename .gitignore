@@ -8,3 +8,12 @@
 *.iws
 *.ipr
 out/
+
+# Node
+node_modules/
+
+# macOS
+.DS_Store
+
+# Logs
+*.log
