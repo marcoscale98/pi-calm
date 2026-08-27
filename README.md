@@ -130,7 +130,7 @@ Pi has no global transcript filter. These stay visible even with Calm on:
 
 Adapters probe the exact Pi APIs they patch (`AssistantMessageComponent.updateContent`, `ToolExecutionComponent.render`, `InteractiveMode.addMessageToChat`, `InteractiveMode.setWorkingVisible`). The `ToolExecutionComponent` patch blanks every non-skill tool row, including user-defined tools, even if another extension wins Pi's first-wins tool ownership (e.g. `pi-tool-display`); native `SKILL.md` rows remain available with `/calm skills`. If a future Pi removes a seam, that adapter logs a diagnostic and skips; `/calm` and the rest keep working. No numeric version gate.
 
-Verified against Pi **0.81.1 – 0.82.1**.
+Upstream was verified against Pi **0.81.1 – 0.82.1**. This fork's `/calm skills` behavior was manually verified against Pi **0.84.2**.
 
 ## Layout
 
