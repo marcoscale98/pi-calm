@@ -9,7 +9,8 @@
  *   - genuine assistant text stays visible
  *   - Pi's built-in Working... activity is always visible and cannot be turned off
  *   - thinking / CoT blocks are hidden by default; `/calm thinking` shows them
- *   - all tool shells (built-in and user-defined) are removed from the transcript
+ *   - native reads of `SKILL.md` stay hidden by default; `/calm skills` shows them
+ *   - all other tool shells (built-in and user-defined) are removed from the transcript
  *   - operational user rows marked with U+2063 envelopes render at zero height
  *
  * Presentation only. Delivery, tool execution, model context, session storage,
@@ -22,8 +23,9 @@
  *   # or: pi -e ./extensions/calm/index.ts
  *
  * Usage:
- *   /calm on           Calm on, thinking hidden
+ *   /calm on           Calm on, thinking and skill reads hidden
  *   /calm thinking     Calm on, toggle thinking / CoT
+ *   /calm skills       Calm on, toggle native SKILL.md reads
  *   /calm off          Calm off
  *
  * Verified against Pi 0.81.1–0.82.1. Adapters probe the exact APIs they patch
@@ -75,10 +77,41 @@ function installCalmPresentationAdapter(name: string, install: () => void): void
 
 function describeCalmState(preference: CalmPreference): string {
   if (!preference.active) return "Calm off — ordinary transcript restored";
-  if (preference.thinking) {
-    return "Calm on — tools hidden, thinking shown";
+  const shown = [
+    preference.thinking ? "thinking" : undefined,
+    preference.skills ? "skill reads" : undefined,
+  ].filter(Boolean);
+  return shown.length > 0
+    ? `Calm on — tools hidden, ${shown.join(" and ")} shown`
+    : "Calm on — tools and thinking hidden";
+}
+
+export function getCalmPreferenceForCommand(
+  argument: string,
+  current: CalmPreference,
+): CalmPreference | undefined {
+  const normalized = argument.trim().toLowerCase();
+  if (normalized === "on") {
+    return { active: true, thinking: false, skills: false };
   }
-  return "Calm on — tools and thinking hidden";
+  if (normalized === "thinking") {
+    return {
+      active: true,
+      thinking: current.active ? !current.thinking : true,
+      skills: current.active ? current.skills : false,
+    };
+  }
+  if (normalized === "skills") {
+    return {
+      active: true,
+      thinking: current.active ? current.thinking : false,
+      skills: current.active ? !current.skills : true,
+    };
+  }
+  if (normalized === "off") {
+    return { active: false, thinking: false, skills: false };
+  }
+  return undefined;
 }
 
 const CALM_COMMAND_ARGUMENTS: AutocompleteItem[] = [
@@ -91,6 +124,11 @@ const CALM_COMMAND_ARGUMENTS: AutocompleteItem[] = [
     value: "thinking",
     label: "thinking",
     description: "Keep Calm on and toggle thinking / CoT",
+  },
+  {
+    value: "skills",
+    label: "skills",
+    description: "Keep Calm on and toggle native SKILL.md reads",
   },
   {
     value: "off",
@@ -117,7 +155,7 @@ export default function (pi: ExtensionAPI) {
     "operational-user-row",
     installCalmOperationalUserLayout,
   );
-  // Hide every tool row regardless of which extension owns the tool.
+  // Hide every non-skill tool row regardless of ownership.
   installCalmPresentationAdapter("tool-row", installCalmToolExecutionLayout);
   // Working... is non-optional chrome for this package.
   installCalmPresentationAdapter("working-lock", installCalmWorkingLock);
@@ -160,6 +198,7 @@ export default function (pi: ExtensionAPI) {
     pi.events.emit(CALM_PRESENTATION_EVENT, {
       active: preference.active,
       thinking: preference.thinking,
+      skills: preference.skills,
       stockExportRendering: exportRendering,
     });
   };
@@ -243,38 +282,18 @@ export default function (pi: ExtensionAPI) {
 
   pi.registerCommand("calm", {
     description:
-      "Calm transcript: /calm on, /calm thinking, or /calm off. Working... always stays on.",
+      "Calm transcript: /calm on, /calm thinking, /calm skills, or /calm off. Working... always stays on.",
     getArgumentCompletions: getCalmArgumentCompletions,
     handler: async (args, ctx) => {
-      const argument = args.trim().toLowerCase();
-      const current = getCalmPreference();
-
-      if (argument === "on") {
-        // /calm on always means Calm on with thinking hidden.
-        setPreference({ active: true, thinking: false }, ctx);
-        return;
-      }
-
-      if (argument === "thinking") {
-        // /calm thinking enables Calm and toggles CoT visibility.
-        setPreference(
-          {
-            active: true,
-            thinking: current.active ? !current.thinking : true,
-          },
-          ctx,
-        );
-        return;
-      }
-
-      if (argument === "off") {
-        setPreference({ active: false, thinking: false }, ctx);
+      const next = getCalmPreferenceForCommand(args, getCalmPreference());
+      if (next) {
+        setPreference(next, ctx);
         return;
       }
 
       if (ctx.hasUI) {
         ctx.ui.notify(
-          "Usage: /calm on | /calm thinking | /calm off",
+          "Usage: /calm on | /calm thinking | /calm skills | /calm off",
           "warning",
         );
       }

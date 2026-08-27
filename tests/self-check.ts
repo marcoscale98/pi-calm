@@ -16,13 +16,19 @@ import {
   applyCalmPreference,
   calmPresentationHides,
   calmPresentationIsActive,
+  calmSkillsAreVisible,
   calmThinkingIsVisible,
+  calmToolCallIsVisible,
   DEFAULT_CALM_PREFERENCE,
   parseCalmPreference,
   serializeCalmPreference,
   setCalmStockExportRendering,
+  isSkillReadToolCall,
 } from "../extensions/calm/lib/visibility.ts";
-import { getCalmArgumentCompletions } from "../extensions/calm/index.ts";
+import {
+  getCalmArgumentCompletions,
+  getCalmPreferenceForCommand,
+} from "../extensions/calm/index.ts";
 
 // --- operational markers ---
 const hide = encodeCalmHideInput("watcher done");
@@ -65,29 +71,76 @@ assert.equal(
 
 // --- preference parse / serialize ---
 assert.deepEqual(parseCalmPreference(""), DEFAULT_CALM_PREFERENCE);
+assert.deepEqual(DEFAULT_CALM_PREFERENCE, {
+  active: true,
+  thinking: false,
+  skills: false,
+});
 assert.deepEqual(parseCalmPreference("on"), {
   active: true,
   thinking: false,
+  skills: false,
 });
 assert.deepEqual(parseCalmPreference("on thinking"), {
   active: true,
   thinking: true,
+  skills: false,
+});
+assert.deepEqual(parseCalmPreference("on skills"), {
+  active: true,
+  thinking: false,
+  skills: true,
+});
+assert.deepEqual(parseCalmPreference("on thinking skills"), {
+  active: true,
+  thinking: true,
+  skills: true,
+});
+assert.deepEqual(parseCalmPreference("on+thinking"), {
+  active: true,
+  thinking: true,
+  skills: false,
+});
+assert.deepEqual(parseCalmPreference("on thinking:on"), {
+  active: true,
+  thinking: true,
+  skills: false,
+});
+assert.deepEqual(parseCalmPreference("on thinking=on"), {
+  active: true,
+  thinking: true,
+  skills: false,
 });
 assert.deepEqual(parseCalmPreference("off"), {
   active: false,
   thinking: false,
+  skills: false,
 });
-assert.equal(serializeCalmPreference({ active: true, thinking: false }), "on\n");
 assert.equal(
-  serializeCalmPreference({ active: true, thinking: true }),
+  serializeCalmPreference({ active: true, thinking: false, skills: false }),
+  "on\n",
+);
+assert.equal(
+  serializeCalmPreference({ active: true, thinking: true, skills: false }),
   "on thinking\n",
 );
-assert.equal(serializeCalmPreference({ active: false, thinking: false }), "off\n");
+assert.equal(
+  serializeCalmPreference({ active: true, thinking: false, skills: true }),
+  "on skills\n",
+);
+assert.equal(
+  serializeCalmPreference({ active: true, thinking: true, skills: true }),
+  "on thinking skills\n",
+);
+assert.equal(
+  serializeCalmPreference({ active: false, thinking: false, skills: false }),
+  "off\n",
+);
 
 // --- command argument completion ---
 assert.deepEqual(
   getCalmArgumentCompletions("")?.map((item) => item.value),
-  ["on", "thinking", "off"],
+  ["on", "thinking", "skills", "off"],
 );
 assert.deepEqual(
   getCalmArgumentCompletions("thi")?.map((item) => item.value),
@@ -96,14 +149,72 @@ assert.deepEqual(
 assert.equal(getCalmArgumentCompletions("thinking "), null);
 assert.equal(getCalmArgumentCompletions("unknown"), null);
 
+// --- command transitions ---
+assert.deepEqual(
+  getCalmPreferenceForCommand("on", {
+    active: true,
+    thinking: true,
+    skills: true,
+  }),
+  { active: true, thinking: false, skills: false },
+);
+assert.deepEqual(
+  getCalmPreferenceForCommand("thinking", {
+    active: true,
+    thinking: false,
+    skills: true,
+  }),
+  { active: true, thinking: true, skills: true },
+);
+assert.deepEqual(
+  getCalmPreferenceForCommand("skills", {
+    active: true,
+    thinking: true,
+    skills: false,
+  }),
+  { active: true, thinking: true, skills: true },
+);
+assert.deepEqual(
+  getCalmPreferenceForCommand("thinking", {
+    active: false,
+    thinking: false,
+    skills: false,
+  }),
+  { active: true, thinking: true, skills: false },
+);
+assert.deepEqual(
+  getCalmPreferenceForCommand("skills", {
+    active: false,
+    thinking: false,
+    skills: false,
+  }),
+  { active: true, thinking: false, skills: true },
+);
+assert.deepEqual(
+  getCalmPreferenceForCommand("off", {
+    active: true,
+    thinking: true,
+    skills: true,
+  }),
+  { active: false, thinking: false, skills: false },
+);
+assert.equal(
+  getCalmPreferenceForCommand("unknown", {
+    active: true,
+    thinking: false,
+    skills: false,
+  }),
+  undefined,
+);
+
 // --- visibility policy ---
 setCalmStockExportRendering(false);
-applyCalmPreference({ active: false, thinking: false });
+applyCalmPreference({ active: false, thinking: false, skills: false });
 assert.equal(calmPresentationIsActive(), false);
 assert.equal(calmPresentationHides("assistant-tool-call"), false);
 assert.equal(calmPresentationHides("assistant-thinking"), false);
 
-applyCalmPreference({ active: true, thinking: false });
+applyCalmPreference({ active: true, thinking: false, skills: false });
 assert.equal(calmPresentationIsActive(), true);
 assert.equal(calmThinkingIsVisible(), false);
 assert.equal(calmPresentationHides("assistant-tool-call"), true);
@@ -113,9 +224,29 @@ assert.equal(calmPresentationHides("synthetic-user"), true);
 assert.equal(calmPresentationHides("genuine-user-prompt"), false);
 assert.equal(calmPresentationHides("genuine-agent-response"), false);
 assert.equal(calmPresentationHides("working-status"), false);
+assert.equal(calmSkillsAreVisible(), false);
+
+// Skill visibility is limited to Pi-native read calls targeting SKILL.md.
+assert.equal(isSkillReadToolCall("read", { path: "skills/demo/SKILL.md" }), true);
+assert.equal(
+  isSkillReadToolCall("read", { path: "skills/demo/SKILL.md" }, false),
+  false,
+);
+assert.equal(isSkillReadToolCall("read", { path: "/tmp/SKILL.md" }), true);
+assert.equal(isSkillReadToolCall("read", { file_path: "skills/demo/SKILL.md" }), true);
+assert.equal(isSkillReadToolCall("read", { path: "skills/demo/skill.md" }), false);
+assert.equal(isSkillReadToolCall("read", { path: "skills/demo/SKILL.MD" }), false);
+assert.equal(isSkillReadToolCall("bash", { path: "skills/demo/SKILL.md" }), false);
+assert.equal(isSkillReadToolCall("read", { path: "skills/demo/other.md" }), false);
+
+applyCalmPreference({ active: true, thinking: false, skills: true });
+assert.equal(calmSkillsAreVisible(), true);
+assert.equal(calmToolCallIsVisible("read", { path: "skills/demo/SKILL.md" }), true);
+assert.equal(calmToolCallIsVisible("read", { path: "skills/demo/other.md" }), false);
+assert.equal(calmToolCallIsVisible("bash", { path: "skills/demo/SKILL.md" }), false);
 
 // /calm thinking shows CoT while tools stay hidden
-applyCalmPreference({ active: true, thinking: true });
+applyCalmPreference({ active: true, thinking: true, skills: false });
 assert.equal(calmThinkingIsVisible(), true);
 assert.equal(calmPresentationHides("assistant-thinking"), false);
 assert.equal(calmPresentationHides("assistant-tool-call"), true);
@@ -125,10 +256,15 @@ assert.equal(calmPresentationHides("working-status"), false);
 setCalmStockExportRendering(true);
 assert.equal(calmPresentationHides("assistant-tool-call"), false);
 assert.equal(calmPresentationHides("assistant-thinking"), false);
+assert.equal(calmToolCallIsVisible("bash", { command: "pwd" }), true);
 setCalmStockExportRendering(false);
 
 // Default preference is on
-assert.deepEqual(DEFAULT_CALM_PREFERENCE, { active: true, thinking: false });
+assert.deepEqual(DEFAULT_CALM_PREFERENCE, {
+  active: true,
+  thinking: false,
+  skills: false,
+});
 
 // --- adapter exports load without throwing when Pi APIs exist ---
 const { installCalmAssistantLayout } = await import(
@@ -149,8 +285,60 @@ installCalmToolExecutionLayout();
 installCalmWorkingLock();
 
 // Tool rows are hidden by their shared renderer, not by a built-in name list.
+applyCalmPreference({ active: true, thinking: false, skills: true });
+PiCodingAgent.initTheme();
 const toolRender = PiCodingAgent.ToolExecutionComponent.prototype.render;
 assert.deepEqual(toolRender.call({}, 80), []);
+const skillTool = new PiCodingAgent.ToolExecutionComponent(
+  "read",
+  "skill-call",
+  { path: "skills/demo/SKILL.md" },
+  {},
+  undefined,
+  { requestRender() {} } as unknown as ConstructorParameters<
+    typeof PiCodingAgent.ToolExecutionComponent
+  >[5],
+  process.cwd(),
+);
+assert.equal(skillTool.render(80).some((line) => line.includes("[skill]")), true);
+const ordinaryReadTool = new PiCodingAgent.ToolExecutionComponent(
+  "read",
+  "ordinary-read-call",
+  { path: "README.md" },
+  {},
+  undefined,
+  { requestRender() {} } as unknown as ConstructorParameters<
+    typeof PiCodingAgent.ToolExecutionComponent
+  >[5],
+  process.cwd(),
+);
+assert.deepEqual(ordinaryReadTool.render(80), []);
+const customReadTool = new PiCodingAgent.ToolExecutionComponent(
+  "read",
+  "custom-read-call",
+  { path: "skills/demo/SKILL.md" },
+  {},
+  {} as unknown as ConstructorParameters<
+    typeof PiCodingAgent.ToolExecutionComponent
+  >[4],
+  { requestRender() {} } as unknown as ConstructorParameters<
+    typeof PiCodingAgent.ToolExecutionComponent
+  >[5],
+  process.cwd(),
+);
+assert.deepEqual(customReadTool.render(80), []);
+skillTool.setExpanded(true);
+assert.equal(skillTool.render(80).some((line) => line.includes("read")), true);
+skillTool.updateResult({
+  content: [{ type: "text", text: "skill result" }],
+  isError: false,
+});
+assert.equal(skillTool.render(80).some((line) => line.includes("skill result")), true);
+skillTool.updateResult({
+  content: [{ type: "text", text: "skill error" }],
+  isError: true,
+});
+assert.equal(skillTool.render(80).some((line) => line.includes("skill error")), true);
 
 // Idempotent reinstall
 installCalmAssistantLayout();

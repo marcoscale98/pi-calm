@@ -1,3 +1,4 @@
+import { basename } from "node:path";
 import {
   getMarkdownTheme,
   type ExtensionAPI,
@@ -51,12 +52,15 @@ export type CalmPresentationState = {
   active: boolean;
   /** When calm is on, whether thinking / CoT blocks are shown. */
   thinking: boolean;
+  /** When calm is on, whether native SKILL.md read rows are shown. */
+  skills: boolean;
   stockExportRendering: boolean;
 };
 
 export type CalmPreference = {
   active: boolean;
   thinking: boolean;
+  skills: boolean;
 };
 
 export type SyntheticPresentation = {
@@ -68,10 +72,12 @@ export type SyntheticPresentation = {
 export const DEFAULT_CALM_PREFERENCE: CalmPreference = {
   active: true,
   thinking: false,
+  skills: false,
 };
 
 let calm = DEFAULT_CALM_PREFERENCE.active;
 let thinkingVisible = DEFAULT_CALM_PREFERENCE.thinking;
+let skillsVisible = DEFAULT_CALM_PREFERENCE.skills;
 let stockExportRendering = false;
 
 export function calmTranscriptClassIsVisible(
@@ -89,6 +95,10 @@ export function setCalmThinkingVisible(visible: boolean): void {
   thinkingVisible = visible;
 }
 
+export function setCalmSkillsVisible(visible: boolean): void {
+  skillsVisible = visible;
+}
+
 export function setCalmStockExportRendering(active: boolean): void {
   stockExportRendering = active;
 }
@@ -101,8 +111,12 @@ export function calmThinkingIsVisible(): boolean {
   return thinkingVisible;
 }
 
+export function calmSkillsAreVisible(): boolean {
+  return skillsVisible;
+}
+
 export function getCalmPreference(): CalmPreference {
-  return { active: calm, thinking: thinkingVisible };
+  return { active: calm, thinking: thinkingVisible, skills: skillsVisible };
 }
 
 /**
@@ -112,6 +126,7 @@ export function getCalmPreference(): CalmPreference {
 export function applyCalmPreference(preference: CalmPreference): void {
   calm = preference.active;
   thinkingVisible = preference.thinking;
+  skillsVisible = preference.skills;
 }
 
 export function calmPresentationHides(itemClass: CalmTranscriptClass): boolean {
@@ -120,13 +135,48 @@ export function calmPresentationHides(itemClass: CalmTranscriptClass): boolean {
   );
 }
 
+/** Return whether a native Pi read call targets a skill definition file. */
+export function isSkillReadToolCall(
+  toolName: unknown,
+  args: unknown,
+  isNativeRead = true,
+): boolean {
+  if (
+    !isNativeRead ||
+    toolName !== "read" ||
+    typeof args !== "object" ||
+    args === null
+  ) {
+    return false;
+  }
+
+  const rawPath = (args as { file_path?: unknown; path?: unknown }).file_path ??
+    (args as { path?: unknown }).path;
+  return typeof rawPath === "string" && basename(rawPath) === "SKILL.md";
+}
+
+/** Tool-row policy: Calm may show only native reads of SKILL.md. */
+export function calmToolCallIsVisible(
+  toolName: unknown,
+  args: unknown,
+  isNativeRead = true,
+): boolean {
+  return (
+    !calm ||
+    stockExportRendering ||
+    (skillsVisible && isSkillReadToolCall(toolName, args, isNativeRead))
+  );
+}
+
 /**
  * Parse preference file contents.
  * Supported:
- *   on              → calm on, thinking hidden (default shape)
- *   on thinking     → calm on, thinking / CoT shown
- *   off             → calm off
- * Legacy bare "on" / "off" (with optional trailing whitespace/newlines) still work.
+ *   on                   → calm on, thinking and skill reads hidden
+ *   on thinking          → calm on, thinking shown, skill reads hidden
+ *   on skills            → calm on, thinking hidden, skill reads shown
+ *   on thinking skills   → calm on, thinking and skill reads shown
+ *   off                  → calm off
+ * Existing preference values such as "on thinking:on" remain compatible.
  * Missing / empty / unreadable → DEFAULT_CALM_PREFERENCE (on).
  */
 export function parseCalmPreference(text: string): CalmPreference {
@@ -142,25 +192,25 @@ export function parseCalmPreference(text: string): CalmPreference {
   if (!normalized) return { ...DEFAULT_CALM_PREFERENCE };
 
   if (normalized === "off") {
-    return { active: false, thinking: false };
+    return { active: false, thinking: false, skills: false };
   }
 
-  if (
-    normalized === "on thinking" ||
-    normalized === "on+thinking" ||
-    normalized === "on thinking:on" ||
-    normalized === "on thinking=on"
-  ) {
-    return { active: true, thinking: true };
+  // Keep the historical compact form accepted by older preference files.
+  if (normalized === "on+thinking") {
+    return { active: true, thinking: true, skills: false };
   }
 
   if (normalized === "on" || normalized.startsWith("on ")) {
-    // "on" or "on thinking off" etc. — only explicit thinking tokens enable CoT
+    // Only explicit tokens enable optional Calm presentation features.
     const thinking =
       /\bthinking\b/.test(normalized) &&
       !/\bthinking\s*(:|=)?\s*off\b/.test(normalized) &&
       !/\bthinking\s+hidden\b/.test(normalized);
-    return { active: true, thinking };
+    const skills =
+      /\bskills\b/.test(normalized) &&
+      !/\bskills\s*(:|=)?\s*off\b/.test(normalized) &&
+      !/\bskills\s+hidden\b/.test(normalized);
+    return { active: true, thinking, skills };
   }
 
   return { ...DEFAULT_CALM_PREFERENCE };
@@ -168,7 +218,9 @@ export function parseCalmPreference(text: string): CalmPreference {
 
 export function serializeCalmPreference(preference: CalmPreference): string {
   if (!preference.active) return "off\n";
+  if (preference.thinking && preference.skills) return "on thinking skills\n";
   if (preference.thinking) return "on thinking\n";
+  if (preference.skills) return "on skills\n";
   return "on\n";
 }
 

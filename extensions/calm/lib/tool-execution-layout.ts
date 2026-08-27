@@ -3,20 +3,27 @@
  *
  * registerTool() can lose to another extension under Pi's first-wins tool
  * ownership. This adapter patches ToolExecutionComponent.render so every
- * tool row—built-in or user-defined—stays hidden under Calm regardless of
- * which extension owns the tool definition.
+ * tool row—built-in or user-defined—stays hidden under Calm, except for
+ * native read rows targeting SKILL.md when `/calm skills` is enabled.
  *
  * Presentation only. Execution, results, and session storage are unchanged.
  */
 import * as PiCodingAgent from "@earendil-works/pi-coding-agent";
-import { calmPresentationHides } from "./visibility.ts";
+import { calmToolCallIsVisible } from "./visibility.ts";
 
 type ToolExecutionPresentation = {
+  toolName?: unknown;
+  args?: unknown;
+  toolDefinition?: unknown;
   render(width: number): string[];
 };
 
 type CalmToolExecutionLayoutPatch = {
-  hidesTools: () => boolean;
+  isToolCallVisible: (
+    toolName: unknown,
+    args: unknown,
+    isNativeRead: boolean,
+  ) => boolean;
 };
 
 const CALM_TOOL_EXECUTION_LAYOUT_PATCH = Symbol.for(
@@ -27,15 +34,18 @@ export function installCalmToolExecutionLayout(): void {
   const registry = globalThis as typeof globalThis & {
     [key: symbol]: CalmToolExecutionLayoutPatch | undefined;
   };
-  const hidesTools = (): boolean =>
-    calmPresentationHides("assistant-tool-call");
+  const isToolCallVisible = (
+    toolName: unknown,
+    args: unknown,
+    isNativeRead: boolean,
+  ): boolean => calmToolCallIsVisible(toolName, args, isNativeRead);
   const installed = registry[CALM_TOOL_EXECUTION_LAYOUT_PATCH];
   if (installed) {
-    installed.hidesTools = hidesTools;
+    installed.isToolCallVisible = isToolCallVisible;
     return;
   }
 
-  const patch: CalmToolExecutionLayoutPatch = { hidesTools };
+  const patch: CalmToolExecutionLayoutPatch = { isToolCallVisible };
   const ToolExecutionComponent = (
     PiCodingAgent as typeof PiCodingAgent & {
       ToolExecutionComponent?: new (...args: never[]) => ToolExecutionPresentation;
@@ -45,14 +55,21 @@ export function installCalmToolExecutionLayout(): void {
     throw new Error("pi-calm requires Pi ToolExecutionComponent");
   }
 
-  const prototype = ToolExecutionComponent.prototype as ToolExecutionPresentation;
+  const prototype =
+    ToolExecutionComponent.prototype as unknown as ToolExecutionPresentation;
   const originalRender = prototype.render;
   if (typeof originalRender !== "function") {
     throw new Error("pi-calm requires Pi ToolExecutionComponent.render");
   }
 
   prototype.render = function (this: ToolExecutionPresentation, width: number): string[] {
-    if (patch.hidesTools()) {
+    if (
+      !patch.isToolCallVisible(
+        this.toolName,
+        this.args,
+        this.toolDefinition === undefined,
+      )
+    ) {
       return [];
     }
     return originalRender.call(this, width);

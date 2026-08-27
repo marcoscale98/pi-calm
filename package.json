@@ -1,7 +1,7 @@
 {
   "name": "pi-calm",
   "version": "1.0.1",
-  "description": "Make Pi easier to follow while it works: keep the conversation and Working... visible while quietly hiding tool chatter and optional thinking. Toggle it with /calm on, /calm thinking, and /calm off.",
+  "description": "Make Pi easier to follow while it works: keep the conversation and Working... visible while quietly hiding tool chatter and optional thinking. Toggle it with /calm on, /calm thinking, /calm skills, and /calm off.",
   "author": "Marco",
   "repository": {
     "type": "git",
