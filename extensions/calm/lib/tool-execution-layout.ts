@@ -11,10 +11,15 @@
 import * as PiCodingAgent from "@earendil-works/pi-coding-agent";
 import { calmToolCallIsVisible } from "./visibility.ts";
 
+type ToolDefinitionPresentation = {
+  parameters?: unknown;
+};
+
 type ToolExecutionPresentation = {
   toolName?: unknown;
   args?: unknown;
-  toolDefinition?: unknown;
+  toolDefinition?: ToolDefinitionPresentation;
+  builtInToolDefinition?: ToolDefinitionPresentation;
   render(width: number): string[];
 };
 
@@ -29,6 +34,22 @@ type CalmToolExecutionLayoutPatch = {
 const CALM_TOOL_EXECUTION_LAYOUT_PATCH = Symbol.for(
   "pi-calm:tool-execution-layout:pi-0.81.1",
 );
+
+function isNativeReadDefinition(
+  presentation: ToolExecutionPresentation,
+): boolean {
+  if (presentation.toolName !== "read") return false;
+
+  // Pi passes the registered definition even for built-in calls, while the
+  // component also creates a separate built-in definition. Their shared
+  // parameter schema is the stable provenance marker for native read.
+  const builtInDefinition = presentation.builtInToolDefinition;
+  if (!builtInDefinition) return false;
+  return (
+    presentation.toolDefinition === undefined ||
+    presentation.toolDefinition.parameters === builtInDefinition.parameters
+  );
+}
 
 export function installCalmToolExecutionLayout(): void {
   const registry = globalThis as typeof globalThis & {
@@ -67,7 +88,7 @@ export function installCalmToolExecutionLayout(): void {
       !patch.isToolCallVisible(
         this.toolName,
         this.args,
-        this.toolDefinition === undefined,
+        isNativeReadDefinition(this),
       )
     ) {
       return [];

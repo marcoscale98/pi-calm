@@ -294,7 +294,7 @@ const skillTool = new PiCodingAgent.ToolExecutionComponent(
   "skill-call",
   { path: "skills/demo/SKILL.md" },
   {},
-  undefined,
+  PiCodingAgent.createReadToolDefinition(process.cwd()),
   { requestRender() {} } as unknown as ConstructorParameters<
     typeof PiCodingAgent.ToolExecutionComponent
   >[5],
@@ -306,7 +306,7 @@ const ordinaryReadTool = new PiCodingAgent.ToolExecutionComponent(
   "ordinary-read-call",
   { path: "README.md" },
   {},
-  undefined,
+  PiCodingAgent.createReadToolDefinition(process.cwd()),
   { requestRender() {} } as unknown as ConstructorParameters<
     typeof PiCodingAgent.ToolExecutionComponent
   >[5],
@@ -318,7 +318,12 @@ const customReadTool = new PiCodingAgent.ToolExecutionComponent(
   "custom-read-call",
   { path: "skills/demo/SKILL.md" },
   {},
-  {} as unknown as ConstructorParameters<
+  {
+    name: "read",
+    label: "read",
+    description: "custom read",
+    parameters: {},
+  } as unknown as ConstructorParameters<
     typeof PiCodingAgent.ToolExecutionComponent
   >[4],
   { requestRender() {} } as unknown as ConstructorParameters<
