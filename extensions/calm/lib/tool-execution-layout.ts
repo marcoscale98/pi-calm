@@ -19,8 +19,16 @@ type ToolExecutionPresentation = {
   toolName?: unknown;
   args?: unknown;
   toolDefinition?: ToolDefinitionPresentation;
-  builtInToolDefinition?: ToolDefinitionPresentation;
   render(width: number): string[];
+};
+
+type ToolSessionPresentation = {
+  getToolDefinition(name: string): ToolDefinitionPresentation | undefined;
+  getAllTools(): {
+    name: unknown;
+    parameters: unknown;
+    sourceInfo?: { source?: unknown };
+  }[];
 };
 
 type CalmToolExecutionLayoutPatch = {
@@ -29,6 +37,7 @@ type CalmToolExecutionLayoutPatch = {
     args: unknown,
     isNativeRead: boolean,
   ) => boolean;
+  nativeReadDefinitions: WeakSet<ToolDefinitionPresentation>;
 };
 
 const CALM_TOOL_EXECUTION_LAYOUT_PATCH = Symbol.for(
@@ -37,17 +46,12 @@ const CALM_TOOL_EXECUTION_LAYOUT_PATCH = Symbol.for(
 
 function isNativeReadDefinition(
   presentation: ToolExecutionPresentation,
+  nativeReadDefinitions: WeakSet<ToolDefinitionPresentation>,
 ): boolean {
-  if (presentation.toolName !== "read") return false;
-
-  // Pi passes the registered definition even for built-in calls, while the
-  // component also creates a separate built-in definition. Their shared
-  // parameter schema is the stable provenance marker for native read.
-  const builtInDefinition = presentation.builtInToolDefinition;
-  if (!builtInDefinition) return false;
   return (
-    presentation.toolDefinition === undefined ||
-    presentation.toolDefinition.parameters === builtInDefinition.parameters
+    presentation.toolName === "read" &&
+    presentation.toolDefinition !== undefined &&
+    nativeReadDefinitions.has(presentation.toolDefinition)
   );
 }
 
@@ -66,7 +70,45 @@ export function installCalmToolExecutionLayout(): void {
     return;
   }
 
-  const patch: CalmToolExecutionLayoutPatch = { isToolCallVisible };
+  const patch: CalmToolExecutionLayoutPatch = {
+    isToolCallVisible,
+    nativeReadDefinitions: new WeakSet(),
+  };
+  const AgentSession = PiCodingAgent.AgentSession as unknown as {
+    prototype: ToolSessionPresentation;
+  } | undefined;
+  if (!AgentSession) {
+    throw new Error("pi-calm requires Pi AgentSession");
+  }
+  const sessionPrototype = AgentSession.prototype;
+  const originalGetToolDefinition = sessionPrototype.getToolDefinition;
+  if (
+    typeof originalGetToolDefinition !== "function" ||
+    typeof sessionPrototype.getAllTools !== "function"
+  ) {
+    throw new Error("pi-calm requires Pi AgentSession tool provenance");
+  }
+  sessionPrototype.getToolDefinition = function (
+    this: ToolSessionPresentation,
+    name: string,
+  ): ToolDefinitionPresentation | undefined {
+    // Pi's registry, not a copyable definition property, establishes provenance.
+    const definition = originalGetToolDefinition.call(this, name);
+    if (
+      name === "read" &&
+      definition &&
+      this.getAllTools().some(
+        (tool) =>
+          tool.name === "read" &&
+          tool.parameters === definition.parameters &&
+          tool.sourceInfo?.source === "builtin",
+      )
+    ) {
+      patch.nativeReadDefinitions.add(definition);
+    }
+    return definition;
+  };
+
   const ToolExecutionComponent = (
     PiCodingAgent as typeof PiCodingAgent & {
       ToolExecutionComponent?: new (...args: never[]) => ToolExecutionPresentation;
@@ -88,7 +130,7 @@ export function installCalmToolExecutionLayout(): void {
       !patch.isToolCallVisible(
         this.toolName,
         this.args,
-        isNativeReadDefinition(this),
+        isNativeReadDefinition(this, patch.nativeReadDefinitions),
       )
     ) {
       return [];

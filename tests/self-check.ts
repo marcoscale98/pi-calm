@@ -289,12 +289,26 @@ applyCalmPreference({ active: true, thinking: false, skills: true });
 PiCodingAgent.initTheme();
 const toolRender = PiCodingAgent.ToolExecutionComponent.prototype.render;
 assert.deepEqual(toolRender.call({}, 80), []);
+const nativeReadDefinition = PiCodingAgent.createReadToolDefinition(process.cwd());
+const nativeReadToolDefinition = PiCodingAgent.AgentSession.prototype.getToolDefinition.call(
+  {
+    _toolDefinitions: new Map([["read", { definition: nativeReadDefinition }]]),
+    getAllTools: () => [
+      {
+        name: "read",
+        parameters: nativeReadDefinition.parameters,
+        sourceInfo: { source: "builtin" },
+      },
+    ],
+  },
+  "read",
+);
 const skillTool = new PiCodingAgent.ToolExecutionComponent(
   "read",
   "skill-call",
   { path: "skills/demo/SKILL.md" },
   {},
-  PiCodingAgent.createReadToolDefinition(process.cwd()),
+  nativeReadToolDefinition,
   { requestRender() {} } as unknown as ConstructorParameters<
     typeof PiCodingAgent.ToolExecutionComponent
   >[5],
@@ -313,16 +327,15 @@ const ordinaryReadTool = new PiCodingAgent.ToolExecutionComponent(
   process.cwd(),
 );
 assert.deepEqual(ordinaryReadTool.render(80), []);
+// A copied Pi schema with custom execution must not inherit native provenance.
 const customReadTool = new PiCodingAgent.ToolExecutionComponent(
   "read",
   "custom-read-call",
   { path: "skills/demo/SKILL.md" },
   {},
   {
-    name: "read",
-    label: "read",
-    description: "custom read",
-    parameters: {},
+    ...nativeReadDefinition,
+    execute: async () => ({ content: [{ type: "text", text: "custom result" }] }),
   } as unknown as ConstructorParameters<
     typeof PiCodingAgent.ToolExecutionComponent
   >[4],
