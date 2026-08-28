@@ -26,6 +26,8 @@
  *   /calm on           Calm on, thinking and skill reads hidden
  *   /calm thinking     Calm on, toggle thinking / CoT
  *   /calm skills       Calm on, toggle SKILL.md reads
+ *   /calm thinking skills
+ *                      Calm on, toggle both thinking / CoT and SKILL.md reads
  *   /calm off          Calm off
  *
  * Verified against Pi 0.81.1–0.82.1. Adapters probe the exact APIs they patch
@@ -108,6 +110,13 @@ export function getCalmPreferenceForCommand(
       skills: current.active ? !current.skills : true,
     };
   }
+  if (normalized === "thinking skills") {
+    return {
+      active: true,
+      thinking: current.active ? !current.thinking : true,
+      skills: current.active ? !current.skills : true,
+    };
+  }
   if (normalized === "off") {
     return { active: false, thinking: false, skills: false };
   }
@@ -135,14 +144,17 @@ const CALM_COMMAND_ARGUMENTS: AutocompleteItem[] = [
     label: "off",
     description: "Disable Calm",
   },
+  {
+    value: "thinking skills",
+    label: "thinking skills",
+    description: "Keep Calm on and toggle thinking / CoT and SKILL.md reads",
+  },
 ];
 
 export function getCalmArgumentCompletions(
   argumentPrefix: string,
 ): AutocompleteItem[] | null {
   const prefix = argumentPrefix.trimStart().toLowerCase();
-  // This command intentionally has exactly one argument.
-  if (prefix.includes(" ")) return null;
   const matches = CALM_COMMAND_ARGUMENTS.filter((item) =>
     item.value.startsWith(prefix),
   );
@@ -282,7 +294,7 @@ export default function (pi: ExtensionAPI) {
 
   pi.registerCommand("calm", {
     description:
-      "Calm transcript: /calm on, /calm thinking, /calm skills, or /calm off. Working... always stays on.",
+      "Calm transcript: /calm on, /calm thinking, /calm skills, /calm thinking skills, or /calm off. Working... always stays on.",
     getArgumentCompletions: getCalmArgumentCompletions,
     handler: async (args, ctx) => {
       const next = getCalmPreferenceForCommand(args, getCalmPreference());
@@ -293,7 +305,7 @@ export default function (pi: ExtensionAPI) {
 
       if (ctx.hasUI) {
         ctx.ui.notify(
-          "Usage: /calm on | /calm thinking | /calm skills | /calm off",
+          "Usage: /calm on | /calm thinking | /calm skills | /calm thinking skills | /calm off",
           "warning",
         );
       }

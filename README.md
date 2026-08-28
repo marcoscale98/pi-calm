@@ -56,17 +56,18 @@ Restart Pi (or `/reload`) after install. Project-local installs require project 
 /calm on              # Calm on, thinking and skill reads hidden
 /calm thinking        # Calm on, toggle thinking / CoT
 /calm skills          # Calm on, toggle read rows targeting SKILL.md
+/calm thinking skills # Calm on, toggle both thinking and skill reads
 /calm off             # restore ordinary transcript
 ```
 
-Pi provides argument completion for these four command arguments after typing
+Pi provides argument completion for these five command forms after typing
 `/calm` followed by a space. `thinking` and `skills` toggle independently and
-preserve the other setting while Calm is active.
+preserve the other setting while Calm is active; `thinking skills` toggles both.
 
 `Working...` is always forced visible and cannot be turned off while this extension is loaded.
 
 There are intentionally no bare `/calm`, `/calm thinking off`, or alias forms; use
-only `on`, `thinking`, `skills`, and `off`.
+only `on`, `thinking`, `skills`, `thinking skills`, and `off`.
 
 Preference is written to:
 
