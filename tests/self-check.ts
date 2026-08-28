@@ -140,13 +140,16 @@ assert.equal(
 // --- command argument completion ---
 assert.deepEqual(
   getCalmArgumentCompletions("")?.map((item) => item.value),
-  ["on", "thinking", "skills", "off"],
+  ["on", "thinking", "skills", "off", "thinking skills"],
 );
 assert.deepEqual(
   getCalmArgumentCompletions("thi")?.map((item) => item.value),
-  ["thinking"],
+  ["thinking", "thinking skills"],
 );
-assert.equal(getCalmArgumentCompletions("thinking "), null);
+assert.deepEqual(
+  getCalmArgumentCompletions("thinking ")?.map((item) => item.value),
+  ["thinking skills"],
+);
 assert.equal(getCalmArgumentCompletions("unknown"), null);
 
 // --- command transitions ---
@@ -189,6 +192,46 @@ assert.deepEqual(
     skills: false,
   }),
   { active: true, thinking: false, skills: true },
+);
+assert.deepEqual(
+  getCalmPreferenceForCommand("thinking skills", {
+    active: false,
+    thinking: false,
+    skills: false,
+  }),
+  { active: true, thinking: true, skills: true },
+);
+assert.deepEqual(
+  getCalmPreferenceForCommand("thinking skills", {
+    active: true,
+    thinking: false,
+    skills: false,
+  }),
+  { active: true, thinking: true, skills: true },
+);
+assert.deepEqual(
+  getCalmPreferenceForCommand("thinking skills", {
+    active: true,
+    thinking: true,
+    skills: true,
+  }),
+  { active: true, thinking: false, skills: false },
+);
+assert.deepEqual(
+  getCalmPreferenceForCommand("thinking skills", {
+    active: true,
+    thinking: true,
+    skills: false,
+  }),
+  { active: true, thinking: false, skills: true },
+);
+assert.deepEqual(
+  getCalmPreferenceForCommand("thinking skills", {
+    active: true,
+    thinking: false,
+    skills: true,
+  }),
+  { active: true, thinking: true, skills: false },
 );
 assert.deepEqual(
   getCalmPreferenceForCommand("off", {
