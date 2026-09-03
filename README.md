@@ -54,26 +54,25 @@ Restart Pi (or `/reload`) after install. Project-local installs require project 
 
 ```text
 /calm on                    # Calm on, thinking and skill reads hidden
-/calm thinking              # Calm on, toggle thinking / CoT
-/calm skills                # Calm on, toggle read rows targeting SKILL.md
-/calm no-built-ins          # Calm on, hide only built-in tool rows
+/calm on thinking           # Calm on and show thinking
 /calm thinking skills       # toggle thinking and skill reads
-/calm no-built-ins thinking # toggle built-in hiding and thinking
-/calm no-built-ins skills   # toggle built-in hiding and skill reads
+/calm thinking skills no-built-ins
+                            # toggle all three modifiers
 /calm off                   # restore ordinary transcript
 ```
 
-Pi provides argument completion for these command forms after typing `/calm`
-followed by a space. `thinking`, `skills`, and `no-built-ins` toggle
-independently and preserve the other settings while Calm is active; either
-order is supported for combined toggles, such as `no-built-ins skills` and
-`skills no-built-ins`.
+Pi provides completion for every ordering of each supported combination after
+`/calm` followed by a space. `thinking`, `skills`, and `no-built-ins` toggle
+independently and can be combined in any order. `on` can be combined with any
+distinct set of those modifiers in any order and starts from Calm's defaults;
+`off` must be used alone. `on` and `off`, unknown arguments, and repeated
+arguments are incompatible and produce a warning without changing the current
+preference.
 
 `Working...` is always forced visible and cannot be turned off while this extension is loaded.
 
-There are intentionally no bare `/calm`, `/calm thinking off`, or alias forms; use
-`on`, `thinking`, `skills`, `no-built-ins`, their supported combinations, and
-`off`.
+There are intentionally no bare `/calm` or alias forms; use `on`, `off`, the
+three modifiers, and their supported combinations.
 
 Preference is written to:
 

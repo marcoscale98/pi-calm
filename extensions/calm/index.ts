@@ -24,13 +24,14 @@
  *   # or: pi -e ./extensions/calm/index.ts
  *
  * Usage:
- *   /calm on           Calm on, thinking and skill reads hidden
- *   /calm thinking     Calm on, toggle thinking / CoT
- *   /calm skills       Calm on, toggle SKILL.md reads
- *   /calm no-built-ins Calm on, hide only built-in tool rows
- *   /calm thinking skills
- *                      Calm on, toggle both thinking / CoT and SKILL.md reads
- *   /calm off          Calm off
+ *   /calm on [thinking|skills|no-built-ins ...]
+ *                      Calm on; distinct modifiers may be combined in any order
+ *   /calm thinking|skills|no-built-ins [...]
+ *                      Toggle one or more modifiers in any order
+ *   /calm off          Calm off; must be used alone
+ *
+ * `on` and `off` cannot be combined; `off` cannot be combined with modifiers;
+ * unknown and repeated arguments are rejected.
  *
  * Verified against Pi 0.81.1–0.82.1. Adapters probe the exact APIs they patch
  * and degrade independently if a future Pi removes a seam.
@@ -91,7 +92,9 @@ function describeCalmState(preference: CalmPreference): string {
     : `Calm on — ${hiddenTools} and thinking hidden`;
 }
 
-const CALM_TOGGLE_ARGUMENTS = new Set([
+const CALM_ARGUMENTS = new Set([
+  "on",
+  "off",
   "thinking",
   "skills",
   "no-built-ins",
@@ -102,15 +105,17 @@ export function getCalmPreferenceForCommand(
   current: CalmPreference,
 ): CalmPreference | undefined {
   const normalized = argument.trim().toLowerCase();
-  if (normalized === "on") {
-    return {
-      active: true,
-      thinking: false,
-      skills: false,
-      noBuiltIns: false,
-    };
+  const tokens = normalized ? normalized.split(/\s+/) : [];
+  if (
+    tokens.length === 0 ||
+    tokens.some((token) => !CALM_ARGUMENTS.has(token)) ||
+    new Set(tokens).size !== tokens.length ||
+    (tokens.includes("off") && tokens.length > 1)
+  ) {
+    return undefined;
   }
-  if (normalized === "off") {
+
+  if (tokens.includes("off")) {
     return {
       active: false,
       thinking: false,
@@ -119,31 +124,56 @@ export function getCalmPreferenceForCommand(
     };
   }
 
-  const toggles = normalized ? normalized.split(/\s+/) : [];
-  if (
-    toggles.length === 0 ||
-    toggles.some((toggle) => !CALM_TOGGLE_ARGUMENTS.has(toggle)) ||
-    new Set(toggles).size !== toggles.length
-  ) {
-    return undefined;
-  }
-
-  const base = current.active
-    ? {
-        thinking: current.thinking,
-        skills: current.skills,
-        noBuiltIns: current.noBuiltIns ?? false,
-      }
-    : { thinking: false, skills: false, noBuiltIns: false };
+  const base = tokens.includes("on")
+    ? { thinking: false, skills: false, noBuiltIns: false }
+    : current.active
+      ? {
+          thinking: current.thinking,
+          skills: current.skills,
+          noBuiltIns: current.noBuiltIns ?? false,
+        }
+      : { thinking: false, skills: false, noBuiltIns: false };
   return {
     active: true,
-    thinking: toggles.includes("thinking") ? !base.thinking : base.thinking,
-    skills: toggles.includes("skills") ? !base.skills : base.skills,
-    noBuiltIns: toggles.includes("no-built-ins")
+    thinking: tokens.includes("thinking") ? !base.thinking : base.thinking,
+    skills: tokens.includes("skills") ? !base.skills : base.skills,
+    noBuiltIns: tokens.includes("no-built-ins")
       ? !base.noBuiltIns
       : base.noBuiltIns,
   };
 }
+
+const CALM_MODIFIER_SUBSETS = [
+  ["thinking"],
+  ["skills"],
+  ["no-built-ins"],
+  ["thinking", "skills"],
+  ["thinking", "no-built-ins"],
+  ["skills", "no-built-ins"],
+  ["thinking", "skills", "no-built-ins"],
+] as const;
+
+function getArgumentPermutations(tokens: readonly string[]): string[][] {
+  if (tokens.length <= 1) return [Array.from(tokens)];
+  return tokens.flatMap((token, index) =>
+    getArgumentPermutations([
+      ...tokens.slice(0, index),
+      ...tokens.slice(index + 1),
+    ]).map((rest) => [token, ...rest]),
+  );
+}
+
+const CALM_ON_ARGUMENTS: AutocompleteItem[] = CALM_MODIFIER_SUBSETS.flatMap(
+  (modifiers) =>
+    getArgumentPermutations(["on", ...modifiers]).map((tokens) => {
+      const value = tokens.join(" ");
+      return {
+        value,
+        label: value,
+        description: "Enable Calm and toggle these modifiers in any order",
+      };
+    }),
+);
 
 const CALM_COMMAND_ARGUMENTS: AutocompleteItem[] = [
   {
@@ -196,6 +226,48 @@ const CALM_COMMAND_ARGUMENTS: AutocompleteItem[] = [
     label: "skills no-built-ins",
     description: "Toggle SKILL.md reads and hide only built-in tool rows",
   },
+  {
+    value: "skills thinking",
+    label: "skills thinking",
+    description: "Toggle SKILL.md reads and thinking / CoT",
+  },
+  {
+    value: "thinking skills no-built-ins",
+    label: "thinking skills no-built-ins",
+    description:
+      "Toggle thinking / CoT, SKILL.md reads, and hide only built-in tool rows",
+  },
+  {
+    value: "thinking no-built-ins skills",
+    label: "thinking no-built-ins skills",
+    description:
+      "Toggle thinking / CoT, hide only built-in tool rows, and SKILL.md reads",
+  },
+  {
+    value: "skills thinking no-built-ins",
+    label: "skills thinking no-built-ins",
+    description:
+      "Toggle SKILL.md reads, thinking / CoT, and hide only built-in tool rows",
+  },
+  {
+    value: "skills no-built-ins thinking",
+    label: "skills no-built-ins thinking",
+    description:
+      "Toggle SKILL.md reads, hide only built-in tool rows, and thinking / CoT",
+  },
+  {
+    value: "no-built-ins thinking skills",
+    label: "no-built-ins thinking skills",
+    description:
+      "Hide only built-in tool rows and toggle thinking / CoT and SKILL.md reads",
+  },
+  {
+    value: "no-built-ins skills thinking",
+    label: "no-built-ins skills thinking",
+    description:
+      "Hide only built-in tool rows and toggle SKILL.md reads and thinking / CoT",
+  },
+  ...CALM_ON_ARGUMENTS,
 ];
 
 export function getCalmArgumentCompletions(
@@ -342,7 +414,7 @@ export default function (pi: ExtensionAPI) {
 
   pi.registerCommand("calm", {
     description:
-      "Calm transcript: /calm on, /calm thinking, /calm skills, /calm no-built-ins, combined thinking/skills/no-built-ins toggles, or /calm off. Working... always stays on.",
+      "Calm transcript: /calm on, optionally with thinking/skills/no-built-ins in any order; or combine those modifiers without on. /calm off must be used alone. on and off, off and modifiers, unknown, or repeated arguments are invalid. Working... always stays on.",
     getArgumentCompletions: getCalmArgumentCompletions,
     handler: async (args, ctx) => {
       const next = getCalmPreferenceForCommand(args, getCalmPreference());
@@ -353,7 +425,7 @@ export default function (pi: ExtensionAPI) {
 
       if (ctx.hasUI) {
         ctx.ui.notify(
-          "Usage: /calm on | /calm thinking | /calm skills | /calm no-built-ins | /calm thinking skills | /calm no-built-ins thinking | /calm no-built-ins skills | /calm off",
+          "Usage: /calm on [thinking|skills|no-built-ins ...] (distinct modifiers, any order) | combine thinking, skills, and no-built-ins in any order | /calm off (alone). Invalid: on with off, off with modifiers, unknown or repeated arguments.",
           "warning",
         );
       }

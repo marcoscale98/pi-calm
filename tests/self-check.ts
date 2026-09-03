@@ -203,37 +203,144 @@ assert.equal(
 );
 
 // --- command argument completion ---
+const allCalmArgumentCompletions = getCalmArgumentCompletions("")?.map(
+  (item) => item.value,
+);
+assert.deepEqual(allCalmArgumentCompletions?.slice(0, 17), [
+  "on",
+  "thinking",
+  "skills",
+  "no-built-ins",
+  "off",
+  "thinking skills",
+  "thinking no-built-ins",
+  "no-built-ins thinking",
+  "no-built-ins skills",
+  "skills no-built-ins",
+  "skills thinking",
+  "thinking skills no-built-ins",
+  "thinking no-built-ins skills",
+  "skills thinking no-built-ins",
+  "skills no-built-ins thinking",
+  "no-built-ins thinking skills",
+  "no-built-ins skills thinking",
+]);
+assert.equal(allCalmArgumentCompletions?.length, 65);
+assert.equal(new Set(allCalmArgumentCompletions).size, 65);
 assert.deepEqual(
-  getCalmArgumentCompletions("")?.map((item) => item.value),
+  getCalmArgumentCompletions("thi")?.map((item) => item.value),
   [
-    "on",
     "thinking",
-    "skills",
-    "no-built-ins",
-    "off",
     "thinking skills",
     "thinking no-built-ins",
-    "no-built-ins thinking",
-    "no-built-ins skills",
-    "skills no-built-ins",
+    "thinking skills no-built-ins",
+    "thinking no-built-ins skills",
+    "thinking on",
+    "thinking on skills",
+    "thinking skills on",
+    "thinking on no-built-ins",
+    "thinking no-built-ins on",
+    "thinking on skills no-built-ins",
+    "thinking on no-built-ins skills",
+    "thinking skills on no-built-ins",
+    "thinking skills no-built-ins on",
+    "thinking no-built-ins on skills",
+    "thinking no-built-ins skills on",
   ],
 );
 assert.deepEqual(
-  getCalmArgumentCompletions("thi")?.map((item) => item.value),
-  ["thinking", "thinking skills", "thinking no-built-ins"],
-);
-assert.deepEqual(
   getCalmArgumentCompletions("thinking ")?.map((item) => item.value),
-  ["thinking skills", "thinking no-built-ins"],
+  [
+    "thinking skills",
+    "thinking no-built-ins",
+    "thinking skills no-built-ins",
+    "thinking no-built-ins skills",
+    "thinking on",
+    "thinking on skills",
+    "thinking skills on",
+    "thinking on no-built-ins",
+    "thinking no-built-ins on",
+    "thinking on skills no-built-ins",
+    "thinking on no-built-ins skills",
+    "thinking skills on no-built-ins",
+    "thinking skills no-built-ins on",
+    "thinking no-built-ins on skills",
+    "thinking no-built-ins skills on",
+  ],
 );
 assert.deepEqual(
   getCalmArgumentCompletions("no-built-ins ")?.map((item) => item.value),
-  ["no-built-ins thinking", "no-built-ins skills"],
+  [
+    "no-built-ins thinking",
+    "no-built-ins skills",
+    "no-built-ins thinking skills",
+    "no-built-ins skills thinking",
+    "no-built-ins on",
+    "no-built-ins on thinking",
+    "no-built-ins thinking on",
+    "no-built-ins on skills",
+    "no-built-ins skills on",
+    "no-built-ins on thinking skills",
+    "no-built-ins on skills thinking",
+    "no-built-ins thinking on skills",
+    "no-built-ins thinking skills on",
+    "no-built-ins skills on thinking",
+    "no-built-ins skills thinking on",
+  ],
 );
 assert.deepEqual(
   getCalmArgumentCompletions("skills ")?.map((item) => item.value),
-  ["skills no-built-ins"],
+  [
+    "skills no-built-ins",
+    "skills thinking",
+    "skills thinking no-built-ins",
+    "skills no-built-ins thinking",
+    "skills on",
+    "skills on thinking",
+    "skills thinking on",
+    "skills on no-built-ins",
+    "skills no-built-ins on",
+    "skills on thinking no-built-ins",
+    "skills on no-built-ins thinking",
+    "skills thinking on no-built-ins",
+    "skills thinking no-built-ins on",
+    "skills no-built-ins on thinking",
+    "skills no-built-ins thinking on",
+  ],
 );
+assert.deepEqual(
+  getCalmArgumentCompletions("on ")?.map((item) => item.value),
+  [
+    "on thinking",
+    "on skills",
+    "on no-built-ins",
+    "on thinking skills",
+    "on skills thinking",
+    "on thinking no-built-ins",
+    "on no-built-ins thinking",
+    "on skills no-built-ins",
+    "on no-built-ins skills",
+    "on thinking skills no-built-ins",
+    "on thinking no-built-ins skills",
+    "on skills thinking no-built-ins",
+    "on skills no-built-ins thinking",
+    "on no-built-ins thinking skills",
+    "on no-built-ins skills thinking",
+  ],
+);
+assert.deepEqual(
+  getCalmArgumentCompletions("thinking o")?.map((item) => item.value),
+  [
+    "thinking on",
+    "thinking on skills",
+    "thinking on no-built-ins",
+    "thinking on skills no-built-ins",
+    "thinking on no-built-ins skills",
+  ],
+);
+assert.equal(getCalmArgumentCompletions("off "), null);
+assert.equal(getCalmArgumentCompletions("on off"), null);
+assert.equal(getCalmArgumentCompletions("thinking thinking"), null);
 assert.equal(getCalmArgumentCompletions("unknown"), null);
 
 // --- command transitions ---
@@ -331,6 +438,42 @@ assert.deepEqual(
   { active: true, thinking: false, skills: false, noBuiltIns: false },
 );
 assert.deepEqual(
+  getCalmPreferenceForCommand("on thinking", {
+    active: true,
+    thinking: true,
+    skills: true,
+    noBuiltIns: true,
+  }),
+  { active: true, thinking: true, skills: false, noBuiltIns: false },
+);
+assert.deepEqual(
+  getCalmPreferenceForCommand("thinking on", {
+    active: true,
+    thinking: true,
+    skills: true,
+    noBuiltIns: true,
+  }),
+  { active: true, thinking: true, skills: false, noBuiltIns: false },
+);
+assert.deepEqual(
+  getCalmPreferenceForCommand("on skills no-built-ins", {
+    active: true,
+    thinking: true,
+    skills: true,
+    noBuiltIns: true,
+  }),
+  { active: true, thinking: false, skills: true, noBuiltIns: true },
+);
+assert.deepEqual(
+  getCalmPreferenceForCommand("no-built-ins skills on", {
+    active: true,
+    thinking: true,
+    skills: true,
+    noBuiltIns: true,
+  }),
+  { active: true, thinking: false, skills: true, noBuiltIns: true },
+);
+assert.deepEqual(
   getCalmPreferenceForCommand("thinking", {
     active: true,
     thinking: false,
@@ -368,6 +511,15 @@ assert.deepEqual(
 );
 assert.deepEqual(
   getCalmPreferenceForCommand("thinking skills", {
+    active: false,
+    thinking: false,
+    skills: false,
+    noBuiltIns: false,
+  }),
+  { active: true, thinking: true, skills: true, noBuiltIns: false },
+);
+assert.deepEqual(
+  getCalmPreferenceForCommand("skills thinking", {
     active: false,
     thinking: false,
     skills: false,
@@ -411,6 +563,55 @@ assert.deepEqual(
   }),
   { active: true, thinking: true, skills: false, noBuiltIns: false },
 );
+for (const argument of [
+  "thinking skills no-built-ins",
+  "thinking no-built-ins skills",
+  "skills thinking no-built-ins",
+  "skills no-built-ins thinking",
+  "no-built-ins thinking skills",
+  "no-built-ins skills thinking",
+]) {
+  assert.deepEqual(
+    getCalmPreferenceForCommand(argument, {
+      active: true,
+      thinking: false,
+      skills: true,
+      noBuiltIns: false,
+    }),
+    { active: true, thinking: true, skills: false, noBuiltIns: true },
+  );
+}
+
+const unchangedPreference = {
+  active: true,
+  thinking: true,
+  skills: false,
+  noBuiltIns: true,
+};
+for (const argument of [
+  "on off",
+  "off on",
+  "off thinking",
+  "thinking off",
+  "off skills",
+  "off no-built-ins",
+  "thinking thinking",
+  "skills skills",
+  "no-built-ins no-built-ins",
+  "unknown",
+]) {
+  assert.equal(
+    getCalmPreferenceForCommand(argument, unchangedPreference),
+    undefined,
+  );
+  assert.deepEqual(unchangedPreference, {
+    active: true,
+    thinking: true,
+    skills: false,
+    noBuiltIns: true,
+  });
+}
+
 assert.deepEqual(
   getCalmPreferenceForCommand("off", {
     active: true,
@@ -418,7 +619,7 @@ assert.deepEqual(
     skills: true,
     noBuiltIns: false,
   }),
-  { active: false, thinking: false, skills: false, noBuiltIns: false }
+  { active: false, thinking: false, skills: false, noBuiltIns: false },
 );
 assert.equal(
   getCalmPreferenceForCommand("unknown", {
