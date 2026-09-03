@@ -10,7 +10,8 @@
  *   - Pi's built-in Working... activity is always visible and cannot be turned off
  *   - thinking / CoT blocks are hidden by default; `/calm thinking` shows them
  *   - reads of `SKILL.md` stay hidden by default; `/calm skills` shows them
- *   - all other tool shells (built-in and user-defined) are removed from the transcript
+ *   - all tool shells (built-in and user-defined) are removed from the transcript,
+ *     or only fixed-name built-in tool shells with `/calm no-built-ins`
  *   - operational user rows marked with U+2063 envelopes render at zero height
  *
  * Presentation only. Delivery, tool execution, model context, session storage,
@@ -26,6 +27,7 @@
  *   /calm on           Calm on, thinking and skill reads hidden
  *   /calm thinking     Calm on, toggle thinking / CoT
  *   /calm skills       Calm on, toggle SKILL.md reads
+ *   /calm no-built-ins Calm on, hide only built-in tool rows
  *   /calm thinking skills
  *                      Calm on, toggle both thinking / CoT and SKILL.md reads
  *   /calm off          Calm off
@@ -83,10 +85,17 @@ function describeCalmState(preference: CalmPreference): string {
     preference.thinking ? "thinking" : undefined,
     preference.skills ? "skill reads" : undefined,
   ].filter(Boolean);
+  const hiddenTools = preference.noBuiltIns ? "built-in tools" : "tools";
   return shown.length > 0
-    ? `Calm on — tools hidden, ${shown.join(" and ")} shown`
-    : "Calm on — tools and thinking hidden";
+    ? `Calm on — ${hiddenTools} hidden, ${shown.join(" and ")} shown`
+    : `Calm on — ${hiddenTools} and thinking hidden`;
 }
+
+const CALM_TOGGLE_ARGUMENTS = new Set([
+  "thinking",
+  "skills",
+  "no-built-ins",
+]);
 
 export function getCalmPreferenceForCommand(
   argument: string,
@@ -94,33 +103,46 @@ export function getCalmPreferenceForCommand(
 ): CalmPreference | undefined {
   const normalized = argument.trim().toLowerCase();
   if (normalized === "on") {
-    return { active: true, thinking: false, skills: false };
-  }
-  if (normalized === "thinking") {
     return {
       active: true,
-      thinking: current.active ? !current.thinking : true,
-      skills: current.active ? current.skills : false,
-    };
-  }
-  if (normalized === "skills") {
-    return {
-      active: true,
-      thinking: current.active ? current.thinking : false,
-      skills: current.active ? !current.skills : true,
-    };
-  }
-  if (normalized === "thinking skills") {
-    return {
-      active: true,
-      thinking: current.active ? !current.thinking : true,
-      skills: current.active ? !current.skills : true,
+      thinking: false,
+      skills: false,
+      noBuiltIns: false,
     };
   }
   if (normalized === "off") {
-    return { active: false, thinking: false, skills: false };
+    return {
+      active: false,
+      thinking: false,
+      skills: false,
+      noBuiltIns: false,
+    };
   }
-  return undefined;
+
+  const toggles = normalized ? normalized.split(/\s+/) : [];
+  if (
+    toggles.length === 0 ||
+    toggles.some((toggle) => !CALM_TOGGLE_ARGUMENTS.has(toggle)) ||
+    new Set(toggles).size !== toggles.length
+  ) {
+    return undefined;
+  }
+
+  const base = current.active
+    ? {
+        thinking: current.thinking,
+        skills: current.skills,
+        noBuiltIns: current.noBuiltIns ?? false,
+      }
+    : { thinking: false, skills: false, noBuiltIns: false };
+  return {
+    active: true,
+    thinking: toggles.includes("thinking") ? !base.thinking : base.thinking,
+    skills: toggles.includes("skills") ? !base.skills : base.skills,
+    noBuiltIns: toggles.includes("no-built-ins")
+      ? !base.noBuiltIns
+      : base.noBuiltIns,
+  };
 }
 
 const CALM_COMMAND_ARGUMENTS: AutocompleteItem[] = [
@@ -140,6 +162,11 @@ const CALM_COMMAND_ARGUMENTS: AutocompleteItem[] = [
     description: "Keep Calm on and toggle SKILL.md reads",
   },
   {
+    value: "no-built-ins",
+    label: "no-built-ins",
+    description: "Keep Calm on and hide only built-in tool rows",
+  },
+  {
     value: "off",
     label: "off",
     description: "Disable Calm",
@@ -148,6 +175,26 @@ const CALM_COMMAND_ARGUMENTS: AutocompleteItem[] = [
     value: "thinking skills",
     label: "thinking skills",
     description: "Keep Calm on and toggle thinking / CoT and SKILL.md reads",
+  },
+  {
+    value: "thinking no-built-ins",
+    label: "thinking no-built-ins",
+    description: "Toggle thinking / CoT and hide only built-in tool rows",
+  },
+  {
+    value: "no-built-ins thinking",
+    label: "no-built-ins thinking",
+    description: "Hide only built-in tool rows and toggle thinking / CoT",
+  },
+  {
+    value: "no-built-ins skills",
+    label: "no-built-ins skills",
+    description: "Hide only built-in tool rows and toggle SKILL.md reads",
+  },
+  {
+    value: "skills no-built-ins",
+    label: "skills no-built-ins",
+    description: "Toggle SKILL.md reads and hide only built-in tool rows",
   },
 ];
 
@@ -211,6 +258,7 @@ export default function (pi: ExtensionAPI) {
       active: preference.active,
       thinking: preference.thinking,
       skills: preference.skills,
+      noBuiltIns: preference.noBuiltIns,
       stockExportRendering: exportRendering,
     });
   };
@@ -294,7 +342,7 @@ export default function (pi: ExtensionAPI) {
 
   pi.registerCommand("calm", {
     description:
-      "Calm transcript: /calm on, /calm thinking, /calm skills, /calm thinking skills, or /calm off. Working... always stays on.",
+      "Calm transcript: /calm on, /calm thinking, /calm skills, /calm no-built-ins, combined thinking/skills/no-built-ins toggles, or /calm off. Working... always stays on.",
     getArgumentCompletions: getCalmArgumentCompletions,
     handler: async (args, ctx) => {
       const next = getCalmPreferenceForCommand(args, getCalmPreference());
@@ -305,7 +353,7 @@ export default function (pi: ExtensionAPI) {
 
       if (ctx.hasUI) {
         ctx.ui.notify(
-          "Usage: /calm on | /calm thinking | /calm skills | /calm thinking skills | /calm off",
+          "Usage: /calm on | /calm thinking | /calm skills | /calm no-built-ins | /calm thinking skills | /calm no-built-ins thinking | /calm no-built-ins skills | /calm off",
           "warning",
         );
       }
