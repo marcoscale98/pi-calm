@@ -53,21 +53,27 @@ Restart Pi (or `/reload`) after install. Project-local installs require project 
 ## Usage
 
 ```text
-/calm on              # Calm on, thinking and skill reads hidden
-/calm thinking        # Calm on, toggle thinking / CoT
-/calm skills          # Calm on, toggle read rows targeting SKILL.md
-/calm thinking skills # Calm on, toggle both thinking and skill reads
-/calm off             # restore ordinary transcript
+/calm on                    # Calm on, thinking and skill reads hidden
+/calm thinking              # Calm on, toggle thinking / CoT
+/calm skills                # Calm on, toggle read rows targeting SKILL.md
+/calm no-built-ins          # Calm on, hide only built-in tool rows
+/calm thinking skills       # toggle thinking and skill reads
+/calm no-built-ins thinking # toggle built-in hiding and thinking
+/calm no-built-ins skills   # toggle built-in hiding and skill reads
+/calm off                   # restore ordinary transcript
 ```
 
-Pi provides argument completion for these five command forms after typing
-`/calm` followed by a space. `thinking` and `skills` toggle independently and
-preserve the other setting while Calm is active; `thinking skills` toggles both.
+Pi provides argument completion for these command forms after typing `/calm`
+followed by a space. `thinking`, `skills`, and `no-built-ins` toggle
+independently and preserve the other settings while Calm is active; either
+order is supported for combined toggles, such as `no-built-ins skills` and
+`skills no-built-ins`.
 
 `Working...` is always forced visible and cannot be turned off while this extension is loaded.
 
 There are intentionally no bare `/calm`, `/calm thinking off`, or alias forms; use
-only `on`, `thinking`, `skills`, `thinking skills`, and `off`.
+`on`, `thinking`, `skills`, `no-built-ins`, their supported combinations, and
+`off`.
 
 Preference is written to:
 
@@ -82,13 +88,22 @@ Contents:
 | `on` | Calm on, thinking and skill reads hidden (default) |
 | `on thinking` | Calm on, thinking / CoT shown, skill reads hidden |
 | `on skills` | Calm on, thinking hidden, `SKILL.md` reads shown |
+| `on no-built-ins` | Calm on, only fixed-name built-in tool rows hidden |
 | `on thinking skills` | Calm on, thinking / CoT and `SKILL.md` reads shown |
-| `off` | Calm off; both optional toggles reset |
+| `on no-built-ins thinking` | Built-in tool rows hidden and thinking shown |
+| `on no-built-ins skills` | Built-in tool rows hidden and `SKILL.md` reads shown |
+| `on no-built-ins thinking skills` | Built-in tool rows hidden, thinking and `SKILL.md` reads shown |
+| `off` | Calm off; all optional toggles reset |
 
 Missing file → defaults to **on**. Override the path with `PI_CALM_PREFERENCE_PATH`.
-The canonical persisted values are `on`, `on thinking`, `on skills`, `on thinking skills`,
-and `off` (one line; trailing whitespace is ignored). Existing `on+thinking`,
-`on thinking:on`, and `on thinking=on` values remain compatible.
+The canonical persisted values are `on`, `on thinking`, `on skills`,
+`on no-built-ins`, their combinations, and `off` (one line; trailing whitespace
+is ignored). Existing `on+thinking`, `on thinking:on`, and `on thinking=on` values
+remain compatible. The `no-built-ins` mode always uses this fixed denylist:
+`read`, `bash`, `powershell`, `edit`, `write`, `grep`, `find`, and `ls`.
+A `read` targeting `SKILL.md` remains visible when `skills` is also enabled;
+other built-in rows stay hidden. Tool names outside this list remain visible,
+including tools added by Pi or extensions in the future.
 
 Preference is restored on every `session_start` (startup, resume, new, fork, reload).
 
@@ -129,7 +144,7 @@ Pi has no global transcript filter. These stay visible even with Calm on:
 - Custom messages and entries emitted by third-party extensions
 - Generic system / cache / command notices
 
-Adapters probe the exact Pi APIs they patch (`AssistantMessageComponent.updateContent`, `ToolExecutionComponent.render`, `InteractiveMode.addMessageToChat`, `InteractiveMode.setWorkingVisible`). The `ToolExecutionComponent` patch blanks every non-skill tool row, including user-defined tools, even if another extension wins Pi's first-wins tool ownership (e.g. `pi-tool-display`); any tool named `read` targeting `SKILL.md` remains available with `/calm skills`, including extension-provided replacements such as `pi-hashline-edit`. If a future Pi removes a seam, that adapter logs a diagnostic and skips; `/calm` and the rest keep working. No numeric version gate.
+Adapters probe the exact Pi APIs they patch (`AssistantMessageComponent.updateContent`, `ToolExecutionComponent.render`, `InteractiveMode.addMessageToChat`, `InteractiveMode.setWorkingVisible`). The `ToolExecutionComponent` patch blanks every non-skill tool row by default, including user-defined tools, even if another extension wins Pi's first-wins tool ownership (e.g. `pi-tool-display`). With `/calm no-built-ins`, only the fixed built-in-name denylist is blanked; unknown and extension-provided tool names remain visible. Any tool named `read` targeting `SKILL.md` remains available with `/calm skills`. If a future Pi removes a seam, that adapter logs a diagnostic and skips; `/calm` and the rest keep working. No numeric version gate.
 
 Upstream was verified against Pi **0.81.1 – 0.82.1**. This fork's `/calm skills` behavior was manually verified against Pi **0.84.2**.
 

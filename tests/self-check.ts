@@ -14,6 +14,7 @@ import {
 } from "../extensions/calm/lib/operational-input.ts";
 import {
   applyCalmPreference,
+  CALM_NO_BUILT_INS_TOOL_NAMES,
   calmPresentationHides,
   calmPresentationIsActive,
   calmSkillsAreVisible,
@@ -75,189 +76,378 @@ assert.deepEqual(DEFAULT_CALM_PREFERENCE, {
   active: true,
   thinking: false,
   skills: false,
+  noBuiltIns: false,
 });
 assert.deepEqual(parseCalmPreference("on"), {
   active: true,
   thinking: false,
   skills: false,
+  noBuiltIns: false,
 });
 assert.deepEqual(parseCalmPreference("on thinking"), {
   active: true,
   thinking: true,
   skills: false,
+  noBuiltIns: false,
 });
 assert.deepEqual(parseCalmPreference("on skills"), {
   active: true,
   thinking: false,
   skills: true,
+  noBuiltIns: false,
+});
+assert.deepEqual(parseCalmPreference("on no-built-ins"), {
+  active: true,
+  thinking: false,
+  skills: false,
+  noBuiltIns: true,
 });
 assert.deepEqual(parseCalmPreference("on thinking skills"), {
   active: true,
   thinking: true,
   skills: true,
+  noBuiltIns: false,
+});
+assert.deepEqual(parseCalmPreference("on no-built-ins thinking skills"), {
+  active: true,
+  thinking: true,
+  skills: true,
+  noBuiltIns: true,
 });
 assert.deepEqual(parseCalmPreference("on+thinking"), {
   active: true,
   thinking: true,
   skills: false,
+  noBuiltIns: false,
 });
 assert.deepEqual(parseCalmPreference("on thinking:on"), {
   active: true,
   thinking: true,
   skills: false,
+  noBuiltIns: false,
 });
 assert.deepEqual(parseCalmPreference("on thinking=on"), {
   active: true,
   thinking: true,
   skills: false,
+  noBuiltIns: false,
 });
 assert.deepEqual(parseCalmPreference("off"), {
   active: false,
   thinking: false,
   skills: false,
+  noBuiltIns: false,
 });
 assert.equal(
-  serializeCalmPreference({ active: true, thinking: false, skills: false }),
+  serializeCalmPreference({
+    active: true,
+    thinking: false,
+    skills: false,
+    noBuiltIns: false,
+  }),
   "on\n",
 );
 assert.equal(
-  serializeCalmPreference({ active: true, thinking: true, skills: false }),
+  serializeCalmPreference({
+    active: true,
+    thinking: true,
+    skills: false,
+    noBuiltIns: false,
+  }),
   "on thinking\n",
 );
 assert.equal(
-  serializeCalmPreference({ active: true, thinking: false, skills: true }),
+  serializeCalmPreference({
+    active: true,
+    thinking: false,
+    skills: true,
+    noBuiltIns: false,
+  }),
   "on skills\n",
 );
 assert.equal(
-  serializeCalmPreference({ active: true, thinking: true, skills: true }),
+  serializeCalmPreference({
+    active: true,
+    thinking: true,
+    skills: true,
+    noBuiltIns: false,
+  }),
   "on thinking skills\n",
 );
 assert.equal(
-  serializeCalmPreference({ active: false, thinking: false, skills: false }),
+  serializeCalmPreference({
+    active: true,
+    thinking: false,
+    skills: false,
+    noBuiltIns: true,
+  }),
+  "on no-built-ins\n",
+);
+assert.equal(
+  serializeCalmPreference({
+    active: true,
+    thinking: true,
+    skills: true,
+    noBuiltIns: true,
+  }),
+  "on no-built-ins thinking skills\n",
+);
+assert.equal(
+  serializeCalmPreference({
+    active: false,
+    thinking: false,
+    skills: false,
+    noBuiltIns: false,
+  }),
   "off\n",
 );
 
 // --- command argument completion ---
 assert.deepEqual(
   getCalmArgumentCompletions("")?.map((item) => item.value),
-  ["on", "thinking", "skills", "off", "thinking skills"],
+  [
+    "on",
+    "thinking",
+    "skills",
+    "no-built-ins",
+    "off",
+    "thinking skills",
+    "thinking no-built-ins",
+    "no-built-ins thinking",
+    "no-built-ins skills",
+    "skills no-built-ins",
+  ],
 );
 assert.deepEqual(
   getCalmArgumentCompletions("thi")?.map((item) => item.value),
-  ["thinking", "thinking skills"],
+  ["thinking", "thinking skills", "thinking no-built-ins"],
 );
 assert.deepEqual(
   getCalmArgumentCompletions("thinking ")?.map((item) => item.value),
-  ["thinking skills"],
+  ["thinking skills", "thinking no-built-ins"],
+);
+assert.deepEqual(
+  getCalmArgumentCompletions("no-built-ins ")?.map((item) => item.value),
+  ["no-built-ins thinking", "no-built-ins skills"],
+);
+assert.deepEqual(
+  getCalmArgumentCompletions("skills ")?.map((item) => item.value),
+  ["skills no-built-ins"],
 );
 assert.equal(getCalmArgumentCompletions("unknown"), null);
 
 // --- command transitions ---
 assert.deepEqual(
+  getCalmPreferenceForCommand("no-built-ins", {
+    active: true,
+    thinking: false,
+    skills: false,
+    noBuiltIns: false,
+  }),
+  {
+    active: true,
+    thinking: false,
+    skills: false,
+    noBuiltIns: true,
+  },
+);
+assert.deepEqual(
+  getCalmPreferenceForCommand("no-built-ins skills", {
+    active: false,
+    thinking: false,
+    skills: false,
+    noBuiltIns: false,
+  }),
+  {
+    active: true,
+    thinking: false,
+    skills: true,
+    noBuiltIns: true,
+  },
+);
+assert.deepEqual(
+  getCalmPreferenceForCommand("skills no-built-ins", {
+    active: true,
+    thinking: true,
+    skills: false,
+    noBuiltIns: false,
+  }),
+  {
+    active: true,
+    thinking: true,
+    skills: true,
+    noBuiltIns: true,
+  },
+);
+assert.deepEqual(
+  getCalmPreferenceForCommand("no-built-ins thinking", {
+    active: false,
+    thinking: false,
+    skills: false,
+    noBuiltIns: false,
+  }),
+  {
+    active: true,
+    thinking: true,
+    skills: false,
+    noBuiltIns: true,
+  },
+);
+assert.deepEqual(
+  getCalmPreferenceForCommand("thinking no-built-ins", {
+    active: true,
+    thinking: false,
+    skills: true,
+    noBuiltIns: false,
+  }),
+  {
+    active: true,
+    thinking: true,
+    skills: true,
+    noBuiltIns: true,
+  },
+);
+assert.deepEqual(
+  getCalmPreferenceForCommand("no-built-ins", {
+    active: true,
+    thinking: false,
+    skills: false,
+    noBuiltIns: true,
+  }),
+  {
+    active: true,
+    thinking: false,
+    skills: false,
+    noBuiltIns: false,
+  },
+);
+assert.deepEqual(
   getCalmPreferenceForCommand("on", {
     active: true,
     thinking: true,
     skills: true,
+    noBuiltIns: true,
   }),
-  { active: true, thinking: false, skills: false },
+  { active: true, thinking: false, skills: false, noBuiltIns: false },
 );
 assert.deepEqual(
   getCalmPreferenceForCommand("thinking", {
     active: true,
     thinking: false,
     skills: true,
+    noBuiltIns: false,
   }),
-  { active: true, thinking: true, skills: true },
+  { active: true, thinking: true, skills: true, noBuiltIns: false },
 );
 assert.deepEqual(
   getCalmPreferenceForCommand("skills", {
     active: true,
     thinking: true,
     skills: false,
+    noBuiltIns: false,
   }),
-  { active: true, thinking: true, skills: true },
+  { active: true, thinking: true, skills: true, noBuiltIns: false },
 );
 assert.deepEqual(
   getCalmPreferenceForCommand("thinking", {
     active: false,
     thinking: false,
     skills: false,
+    noBuiltIns: false,
   }),
-  { active: true, thinking: true, skills: false },
+  { active: true, thinking: true, skills: false, noBuiltIns: false },
 );
 assert.deepEqual(
   getCalmPreferenceForCommand("skills", {
     active: false,
     thinking: false,
     skills: false,
+    noBuiltIns: false,
   }),
-  { active: true, thinking: false, skills: true },
+  { active: true, thinking: false, skills: true, noBuiltIns: false },
 );
 assert.deepEqual(
   getCalmPreferenceForCommand("thinking skills", {
     active: false,
     thinking: false,
     skills: false,
+    noBuiltIns: false,
   }),
-  { active: true, thinking: true, skills: true },
+  { active: true, thinking: true, skills: true, noBuiltIns: false },
 );
 assert.deepEqual(
   getCalmPreferenceForCommand("thinking skills", {
     active: true,
     thinking: false,
     skills: false,
+    noBuiltIns: false,
   }),
-  { active: true, thinking: true, skills: true },
+  { active: true, thinking: true, skills: true, noBuiltIns: false },
 );
 assert.deepEqual(
   getCalmPreferenceForCommand("thinking skills", {
     active: true,
     thinking: true,
     skills: true,
+    noBuiltIns: false,
   }),
-  { active: true, thinking: false, skills: false },
+  { active: true, thinking: false, skills: false, noBuiltIns: false },
 );
 assert.deepEqual(
   getCalmPreferenceForCommand("thinking skills", {
     active: true,
     thinking: true,
     skills: false,
+    noBuiltIns: false,
   }),
-  { active: true, thinking: false, skills: true },
+  { active: true, thinking: false, skills: true, noBuiltIns: false },
 );
 assert.deepEqual(
   getCalmPreferenceForCommand("thinking skills", {
     active: true,
     thinking: false,
     skills: true,
+    noBuiltIns: false,
   }),
-  { active: true, thinking: true, skills: false },
+  { active: true, thinking: true, skills: false, noBuiltIns: false },
 );
 assert.deepEqual(
   getCalmPreferenceForCommand("off", {
     active: true,
     thinking: true,
     skills: true,
+    noBuiltIns: false,
   }),
-  { active: false, thinking: false, skills: false },
+  { active: false, thinking: false, skills: false, noBuiltIns: false }
 );
 assert.equal(
   getCalmPreferenceForCommand("unknown", {
     active: true,
     thinking: false,
     skills: false,
+    noBuiltIns: false,
   }),
   undefined,
 );
 
 // --- visibility policy ---
 setCalmStockExportRendering(false);
-applyCalmPreference({ active: false, thinking: false, skills: false });
+applyCalmPreference({
+  active: false,
+  thinking: false,
+  skills: false,
+  noBuiltIns: false,
+});
 assert.equal(calmPresentationIsActive(), false);
 assert.equal(calmPresentationHides("assistant-tool-call"), false);
 assert.equal(calmPresentationHides("assistant-thinking"), false);
 
-applyCalmPreference({ active: true, thinking: false, skills: false });
+applyCalmPreference({
+  active: true,
+  thinking: false,
+  skills: false,
+  noBuiltIns: false,
+});
 assert.equal(calmPresentationIsActive(), true);
 assert.equal(calmThinkingIsVisible(), false);
 assert.equal(calmPresentationHides("assistant-tool-call"), true);
@@ -282,14 +472,63 @@ assert.equal(isSkillReadToolCall("read", { path: "skills/demo/SKILL.MD" }), fals
 assert.equal(isSkillReadToolCall("bash", { path: "skills/demo/SKILL.md" }), false);
 assert.equal(isSkillReadToolCall("read", { path: "skills/demo/other.md" }), false);
 
-applyCalmPreference({ active: true, thinking: false, skills: true });
+// No-built-ins uses a fixed denylist and leaves unknown tool names visible.
+assert.deepEqual([...CALM_NO_BUILT_INS_TOOL_NAMES], [
+  "read",
+  "bash",
+  "powershell",
+  "edit",
+  "write",
+  "grep",
+  "find",
+  "ls",
+]);
+applyCalmPreference({
+  active: true,
+  thinking: false,
+  skills: false,
+  noBuiltIns: true,
+});
+for (const toolName of CALM_NO_BUILT_INS_TOOL_NAMES) {
+  assert.equal(calmToolCallIsVisible(toolName, {}), false);
+}
+assert.equal(calmToolCallIsVisible("future-extension-tool", {}), true);
+assert.equal(
+  calmToolCallIsVisible("read", { path: "skills/demo/SKILL.md" }),
+  false,
+);
+applyCalmPreference({
+  active: true,
+  thinking: false,
+  skills: true,
+  noBuiltIns: true,
+});
+assert.equal(
+  calmToolCallIsVisible("read", { path: "skills/demo/SKILL.md" }),
+  true,
+);
+assert.equal(calmToolCallIsVisible("bash", {}), false);
+assert.equal(calmToolCallIsVisible("future-extension-tool", {}), true);
+
+applyCalmPreference({
+  active: true,
+  thinking: false,
+  skills: true,
+  noBuiltIns: false,
+});
 assert.equal(calmSkillsAreVisible(), true);
 assert.equal(calmToolCallIsVisible("read", { path: "skills/demo/SKILL.md" }), true);
 assert.equal(calmToolCallIsVisible("read", { path: "skills/demo/other.md" }), false);
 assert.equal(calmToolCallIsVisible("bash", { path: "skills/demo/SKILL.md" }), false);
+assert.equal(calmToolCallIsVisible("future-extension-tool", {}), false);
 
 // /calm thinking shows CoT while tools stay hidden
-applyCalmPreference({ active: true, thinking: true, skills: false });
+applyCalmPreference({
+  active: true,
+  thinking: true,
+  skills: false,
+  noBuiltIns: false,
+});
 assert.equal(calmThinkingIsVisible(), true);
 assert.equal(calmPresentationHides("assistant-thinking"), false);
 assert.equal(calmPresentationHides("assistant-tool-call"), true);
@@ -307,6 +546,7 @@ assert.deepEqual(DEFAULT_CALM_PREFERENCE, {
   active: true,
   thinking: false,
   skills: false,
+  noBuiltIns: false,
 });
 
 // --- adapter exports load without throwing when Pi APIs exist ---
@@ -328,7 +568,12 @@ installCalmToolExecutionLayout();
 installCalmWorkingLock();
 
 // Tool rows are hidden by their shared renderer, not by a built-in name list.
-applyCalmPreference({ active: true, thinking: false, skills: true });
+applyCalmPreference({
+  active: true,
+  thinking: false,
+  skills: true,
+  noBuiltIns: false,
+});
 PiCodingAgent.initTheme();
 const toolRender = PiCodingAgent.ToolExecutionComponent.prototype.render;
 assert.deepEqual(toolRender.call({}, 80), []);

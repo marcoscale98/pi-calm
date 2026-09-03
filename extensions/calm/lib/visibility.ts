@@ -54,6 +54,8 @@ export type CalmPresentationState = {
   thinking: boolean;
   /** When calm is on, whether SKILL.md read rows are shown. */
   skills: boolean;
+  /** When calm is on, whether only built-in tool rows are hidden. */
+  noBuiltIns: boolean;
   stockExportRendering: boolean;
 };
 
@@ -61,6 +63,7 @@ export type CalmPreference = {
   active: boolean;
   thinking: boolean;
   skills: boolean;
+  noBuiltIns: boolean;
 };
 
 export type SyntheticPresentation = {
@@ -73,11 +76,13 @@ export const DEFAULT_CALM_PREFERENCE: CalmPreference = {
   active: true,
   thinking: false,
   skills: false,
+  noBuiltIns: false,
 };
 
 let calm = DEFAULT_CALM_PREFERENCE.active;
 let thinkingVisible = DEFAULT_CALM_PREFERENCE.thinking;
 let skillsVisible = DEFAULT_CALM_PREFERENCE.skills;
+let noBuiltIns = DEFAULT_CALM_PREFERENCE.noBuiltIns;
 let stockExportRendering = false;
 
 export function calmTranscriptClassIsVisible(
@@ -116,7 +121,12 @@ export function calmSkillsAreVisible(): boolean {
 }
 
 export function getCalmPreference(): CalmPreference {
-  return { active: calm, thinking: thinkingVisible, skills: skillsVisible };
+  return {
+    active: calm,
+    thinking: thinkingVisible,
+    skills: skillsVisible,
+    noBuiltIns,
+  };
 }
 
 /**
@@ -127,6 +137,7 @@ export function applyCalmPreference(preference: CalmPreference): void {
   calm = preference.active;
   thinkingVisible = preference.thinking;
   skillsVisible = preference.skills;
+  noBuiltIns = preference.noBuiltIns ?? false;
 }
 
 export function calmPresentationHides(itemClass: CalmTranscriptClass): boolean {
@@ -149,15 +160,29 @@ export function isSkillReadToolCall(
   return typeof rawPath === "string" && basename(rawPath) === "SKILL.md";
 }
 
-/** Tool-row policy: Calm may show only reads of SKILL.md. */
+/** Fixed built-in tool names hidden by the no-built-ins mode. */
+export const CALM_NO_BUILT_INS_TOOL_NAMES: ReadonlySet<string> = new Set([
+  "read",
+  "bash",
+  "powershell",
+  "edit",
+  "write",
+  "grep",
+  "find",
+  "ls",
+]);
+
+/** Tool-row policy: default Calm shows skill reads; no-built-ins shows non-built-in tools. */
 export function calmToolCallIsVisible(
   toolName: unknown,
   args: unknown,
 ): boolean {
+  if (!calm || stockExportRendering) return true;
+  if (skillsVisible && isSkillReadToolCall(toolName, args)) return true;
+  if (!noBuiltIns) return false;
   return (
-    !calm ||
-    stockExportRendering ||
-    (skillsVisible && isSkillReadToolCall(toolName, args))
+    typeof toolName !== "string" ||
+    !CALM_NO_BUILT_INS_TOOL_NAMES.has(toolName)
   );
 }
 
@@ -167,6 +192,7 @@ export function calmToolCallIsVisible(
  *   on                   → calm on, thinking and skill reads hidden
  *   on thinking          → calm on, thinking shown, skill reads hidden
  *   on skills            → calm on, thinking hidden, skill reads shown
+ *   on no-built-ins      → calm on, built-in tool rows hidden
  *   on thinking skills   → calm on, thinking and skill reads shown
  *   off                  → calm off
  * Existing preference values such as "on thinking:on" remain compatible.
@@ -185,12 +211,22 @@ export function parseCalmPreference(text: string): CalmPreference {
   if (!normalized) return { ...DEFAULT_CALM_PREFERENCE };
 
   if (normalized === "off") {
-    return { active: false, thinking: false, skills: false };
+    return {
+      active: false,
+      thinking: false,
+      skills: false,
+      noBuiltIns: false,
+    };
   }
 
   // Keep the historical compact form accepted by older preference files.
   if (normalized === "on+thinking") {
-    return { active: true, thinking: true, skills: false };
+    return {
+      active: true,
+      thinking: true,
+      skills: false,
+      noBuiltIns: false,
+    };
   }
 
   if (normalized === "on" || normalized.startsWith("on ")) {
@@ -203,7 +239,8 @@ export function parseCalmPreference(text: string): CalmPreference {
       /\bskills\b/.test(normalized) &&
       !/\bskills\s*(:|=)?\s*off\b/.test(normalized) &&
       !/\bskills\s+hidden\b/.test(normalized);
-    return { active: true, thinking, skills };
+    const noBuiltIns = /\bno-built-ins\b/.test(normalized);
+    return { active: true, thinking, skills, noBuiltIns };
   }
 
   return { ...DEFAULT_CALM_PREFERENCE };
@@ -211,10 +248,12 @@ export function parseCalmPreference(text: string): CalmPreference {
 
 export function serializeCalmPreference(preference: CalmPreference): string {
   if (!preference.active) return "off\n";
-  if (preference.thinking && preference.skills) return "on thinking skills\n";
-  if (preference.thinking) return "on thinking\n";
-  if (preference.skills) return "on skills\n";
-  return "on\n";
+  const options = [
+    preference.noBuiltIns ? "no-built-ins" : undefined,
+    preference.thinking ? "thinking" : undefined,
+    preference.skills ? "skills" : undefined,
+  ].filter(Boolean);
+  return `on${options.length > 0 ? ` ${options.join(" ")}` : ""}\n`;
 }
 
 /**

@@ -4,7 +4,8 @@
  * registerTool() can lose to another extension under Pi's first-wins tool
  * ownership. This adapter patches ToolExecutionComponent.render so every
  * tool row—built-in or user-defined—stays hidden under Calm, except for
- * read rows targeting SKILL.md when `/calm skills` is enabled.
+ * read rows targeting SKILL.md when `/calm skills` is enabled. In
+ * `/calm no-built-ins` mode, only the fixed built-in-name denylist is hidden.
  *
  * Presentation only. Execution, results, and session storage are unchanged.
  */
