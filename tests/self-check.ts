@@ -21,6 +21,7 @@ import {
   calmThinkingIsVisible,
   calmToolCallIsVisible,
   DEFAULT_CALM_PREFERENCE,
+  getCalmPreference,
   parseCalmPreference,
   serializeCalmPreference,
   setCalmStockExportRendering,
@@ -29,7 +30,15 @@ import {
 import {
   getCalmArgumentCompletions,
   getCalmPreferenceForCommand,
+  resolveCalmCommand,
 } from "../extensions/calm/index.ts";
+import {
+  applyCalmSettingsChange,
+  canOpenCalmSettingsPanel,
+  getCalmSettingsItems,
+  isCalmSettingsCommand,
+  openCalmSettingsPanel,
+} from "../extensions/calm/lib/settings.ts";
 
 // --- operational markers ---
 const hide = encodeCalmHideInput("watcher done");
@@ -342,6 +351,187 @@ assert.equal(getCalmArgumentCompletions("off "), null);
 assert.equal(getCalmArgumentCompletions("on off"), null);
 assert.equal(getCalmArgumentCompletions("thinking thinking"), null);
 assert.equal(getCalmArgumentCompletions("unknown"), null);
+
+// --- /calm with no arguments opens settings ---
+assert.equal(isCalmSettingsCommand(""), true);
+assert.equal(isCalmSettingsCommand("   "), true);
+assert.equal(isCalmSettingsCommand("on"), false);
+assert.equal(isCalmSettingsCommand("thinking"), false);
+assert.deepEqual(
+  resolveCalmCommand("", {
+    active: true,
+    thinking: true,
+    skills: false,
+    noBuiltIns: true,
+  }),
+  { kind: "settings" },
+);
+assert.deepEqual(
+  resolveCalmCommand("   ", {
+    active: true,
+    thinking: true,
+    skills: false,
+    noBuiltIns: true,
+  }),
+  { kind: "settings" },
+);
+assert.deepEqual(
+  resolveCalmCommand("on", {
+    active: true,
+    thinking: true,
+    skills: true,
+    noBuiltIns: true,
+  }),
+  {
+    kind: "preference",
+    next: { active: true, thinking: false, skills: false, noBuiltIns: false },
+  },
+);
+assert.deepEqual(
+  resolveCalmCommand("unknown", {
+    active: true,
+    thinking: true,
+    skills: false,
+    noBuiltIns: true,
+  }),
+  { kind: "invalid" },
+);
+assert.equal(canOpenCalmSettingsPanel({ hasUI: true, mode: "tui" }), true);
+assert.equal(canOpenCalmSettingsPanel({ hasUI: true }), true);
+assert.equal(canOpenCalmSettingsPanel({ hasUI: true, mode: "rpc" }), false);
+assert.equal(canOpenCalmSettingsPanel({ hasUI: false, mode: "print" }), false);
+assert.equal(canOpenCalmSettingsPanel({ hasUI: false }), false);
+
+const settingsItems = getCalmSettingsItems({
+  active: true,
+  thinking: false,
+  skills: true,
+  noBuiltIns: false,
+});
+assert.deepEqual(
+  settingsItems.map((item) => item.id),
+  ["calm", "thinking", "skills", "no-built-ins"],
+);
+assert.equal(
+  settingsItems.some((item) => /working/i.test(item.id) || /working/i.test(item.label)),
+  false,
+);
+assert.deepEqual(
+  Object.fromEntries(settingsItems.map((item) => [item.id, item.currentValue])),
+  {
+    calm: "true",
+    thinking: "false",
+    skills: "true",
+    "no-built-ins": "false",
+  },
+);
+for (const item of settingsItems) {
+  assert.deepEqual(item.values, ["true", "false"]);
+}
+
+// Panel toggles apply independently and immediately to the preference snapshot.
+let panelPreference = {
+  active: true,
+  thinking: false,
+  skills: false,
+  noBuiltIns: false,
+};
+panelPreference = applyCalmSettingsChange("thinking", "true", panelPreference)!;
+assert.deepEqual(panelPreference, {
+  active: true,
+  thinking: true,
+  skills: false,
+  noBuiltIns: false,
+});
+panelPreference = applyCalmSettingsChange("skills", "true", panelPreference)!;
+assert.deepEqual(panelPreference, {
+  active: true,
+  thinking: true,
+  skills: true,
+  noBuiltIns: false,
+});
+panelPreference = applyCalmSettingsChange("no-built-ins", "true", panelPreference)!;
+assert.deepEqual(panelPreference, {
+  active: true,
+  thinking: true,
+  skills: true,
+  noBuiltIns: true,
+});
+assert.equal(serializeCalmPreference(panelPreference), "on no-built-ins thinking skills\n");
+panelPreference = applyCalmSettingsChange("calm", "false", panelPreference)!;
+assert.deepEqual(panelPreference, {
+  active: false,
+  thinking: true,
+  skills: true,
+  noBuiltIns: true,
+});
+assert.equal(serializeCalmPreference(panelPreference), "off\n");
+panelPreference = applyCalmSettingsChange("calm", "true", panelPreference)!;
+assert.deepEqual(panelPreference, {
+  active: true,
+  thinking: true,
+  skills: true,
+  noBuiltIns: true,
+});
+panelPreference = applyCalmSettingsChange("thinking", "false", panelPreference)!;
+assert.deepEqual(panelPreference, {
+  active: true,
+  thinking: false,
+  skills: true,
+  noBuiltIns: true,
+});
+assert.equal(applyCalmSettingsChange("working", "false", panelPreference), undefined);
+assert.equal(applyCalmSettingsChange("calm", "maybe", panelPreference), undefined);
+
+applyCalmPreference(panelPreference);
+assert.equal(getCalmPreference().active, true);
+assert.equal(getCalmPreference().thinking, false);
+assert.equal(getCalmPreference().skills, true);
+assert.equal(getCalmPreference().noBuiltIns, true);
+
+// Panel factory: toggling applies immediately; cancel closes without a further change.
+{
+  PiCodingAgent.initTheme();
+  const applied = [];
+  let closed = false;
+  await openCalmSettingsPanel(
+    {
+      ui: {
+        custom: async (factory) => {
+          const component = factory(
+            { requestRender() {} },
+            {
+              fg: (_color: string, text: string) => text,
+              bold: (text: string) => text,
+            },
+            {},
+            () => {
+              closed = true;
+            },
+          );
+          const beforeToggle = getCalmPreference();
+          component.handleInput?.(" ");
+          assert.deepEqual(applied, [
+            {
+              active: false,
+              thinking: beforeToggle.thinking,
+              skills: beforeToggle.skills,
+              noBuiltIns: beforeToggle.noBuiltIns,
+            },
+          ]);
+          component.handleInput?.("\x1b");
+          return undefined;
+        },
+      },
+    } as never,
+    (preference) => {
+      applied.push(preference);
+      applyCalmPreference(preference);
+    },
+  );
+  assert.equal(closed, true);
+  assert.equal(applied.length, 1);
+}
 
 // --- command transitions ---
 assert.deepEqual(

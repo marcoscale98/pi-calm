@@ -24,6 +24,7 @@
  *   # or: pi -e ./extensions/calm/index.ts
  *
  * Usage:
+ *   /calm              Open the Calm settings panel (TUI)
  *   /calm on [thinking|skills|no-built-ins ...]
  *                      Calm on; distinct modifiers may be combined in any order
  *   /calm thinking|skills|no-built-ins [...]
@@ -55,6 +56,12 @@ import { installCalmAssistantLayout } from "./lib/assistant-layout.ts";
 import { installCalmOperationalUserLayout } from "./lib/operational-user-layout.ts";
 import { installCalmToolExecutionLayout } from "./lib/tool-execution-layout.ts";
 import { installCalmWorkingLock } from "./lib/working-lock.ts";
+import {
+  canOpenCalmSettingsPanel,
+  isCalmSettingsCommand,
+  openCalmSettingsPanel,
+  type CalmCommandResolution,
+} from "./lib/settings.ts";
 import {
   applyCalmPreference,
   CALM_PRESENTATION_EVENT,
@@ -99,6 +106,20 @@ const CALM_ARGUMENTS = new Set([
   "skills",
   "no-built-ins",
 ]);
+
+const CALM_USAGE =
+  "Usage: /calm (TUI settings) | /calm on [thinking|skills|no-built-ins ...] (distinct modifiers, any order) | combine thinking, skills, and no-built-ins in any order | /calm off (alone). Invalid: on with off, off with modifiers, unknown or repeated arguments.";
+
+export function resolveCalmCommand(
+  argument: string,
+  current: CalmPreference,
+): CalmCommandResolution {
+  if (isCalmSettingsCommand(argument)) {
+    return { kind: "settings" };
+  }
+  const next = getCalmPreferenceForCommand(argument, current);
+  return next ? { kind: "preference", next } : { kind: "invalid" };
+}
 
 export function getCalmPreferenceForCommand(
   argument: string,
@@ -414,20 +435,36 @@ export default function (pi: ExtensionAPI) {
 
   pi.registerCommand("calm", {
     description:
-      "Calm transcript: /calm on, optionally with thinking/skills/no-built-ins in any order; or combine those modifiers without on. /calm off must be used alone. on and off, off and modifiers, unknown, or repeated arguments are invalid. Working... always stays on.",
+      "Calm transcript: /calm opens settings in TUI. /calm on, optionally with thinking/skills/no-built-ins in any order; or combine those modifiers without on. /calm off must be used alone. on and off, off and modifiers, unknown, or repeated arguments are invalid. Working... always stays on.",
     getArgumentCompletions: getCalmArgumentCompletions,
     handler: async (args, ctx) => {
-      const next = getCalmPreferenceForCommand(args, getCalmPreference());
-      if (next) {
-        setPreference(next, ctx);
+      const resolution = resolveCalmCommand(args, getCalmPreference());
+      if (resolution.kind === "preference") {
+        setPreference(resolution.next, ctx);
+        return;
+      }
+
+      if (resolution.kind === "settings") {
+        if (
+          !canOpenCalmSettingsPanel({
+            hasUI: ctx.hasUI,
+            mode: (ctx as { mode?: string }).mode,
+          })
+        ) {
+          if (ctx.hasUI) {
+            ctx.ui.notify(CALM_USAGE, "warning");
+          }
+          return;
+        }
+
+        await openCalmSettingsPanel(ctx, (preference) => {
+          setPreference(preference, ctx, false);
+        });
         return;
       }
 
       if (ctx.hasUI) {
-        ctx.ui.notify(
-          "Usage: /calm on [thinking|skills|no-built-ins ...] (distinct modifiers, any order) | combine thinking, skills, and no-built-ins in any order | /calm off (alone). Invalid: on with off, off with modifiers, unknown or repeated arguments.",
-          "warning",
-        );
+        ctx.ui.notify(CALM_USAGE, "warning");
       }
     },
   });
