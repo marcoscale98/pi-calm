@@ -53,6 +53,7 @@ Restart Pi (or `/reload`) after install. Project-local installs require project 
 ## Usage
 
 ```text
+/calm                       # open Calm settings (TUI)
 /calm on                    # Calm on, thinking and skill reads hidden
 /calm on thinking           # Calm on and show thinking
 /calm thinking skills       # toggle thinking and skill reads
@@ -61,18 +62,24 @@ Restart Pi (or `/reload`) after install. Project-local installs require project 
 /calm off                   # restore ordinary transcript
 ```
 
+In TUI, `/calm` with no arguments opens a settings list in the style of
+`/settings`. The list has independent true/false toggles for Calm, thinking /
+CoT, `SKILL.md` reads, and `no-built-ins`, initialized from the current
+preference. Each change applies to the transcript immediately and is saved with
+the same `~/.pi/agent/calm` mechanism as the argumented commands. Escape or
+cancel closes the panel and returns the editor; it does not undo changes already
+made. `Working...` is not listed and stays visible.
+
 Pi provides completion for every ordering of each supported combination after
 `/calm` followed by a space. `thinking`, `skills`, and `no-built-ins` toggle
 independently and can be combined in any order. `on` can be combined with any
 distinct set of those modifiers in any order and starts from Calm's defaults;
 `off` must be used alone. `on` and `off`, unknown arguments, and repeated
 arguments are incompatible and produce a warning without changing the current
-preference.
+preference. Outside TUI, bare `/calm` shows the same usage warning as other
+invalid forms.
 
 `Working...` is always forced visible and cannot be turned off while this extension is loaded.
-
-There are intentionally no bare `/calm` or alias forms; use `on`, `off`, the
-three modifiers, and their supported combinations.
 
 Preference is written to:
 
@@ -155,6 +162,7 @@ extensions/calm/
   index.ts                   # /calm command, tool wrappers, preference
   lib/
     visibility.ts            # presentation policy + preference + legacy entry renderer
+    settings.ts              # /calm settings panel (TUI, no arguments)
     operational-input.ts     # pure TS marker encode/classify
     assistant-layout.ts      # thinking/CoT presentation adapter
     tool-execution-layout.ts # all tool-row zero-height adapter
